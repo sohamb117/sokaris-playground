@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "runtime": "SubsetJuliaVM",
+  "version": "0.12.2",
+  "commit": "561587e7a6f3914a24afd883a0dba52d51f3453d",
+  "source": "https://github.com/terasakisatoshi/subset_julia/tree/561587e7a6f3914a24afd883a0dba52d51f3453d/pkg",
+  "files": [
+    {
+      "path": "subset_julia_vm_web.js",
+      "sha256": "3a0754a8ebc51dcc2ddf2c3f62cb1013ab23483becef4806898ff2ea7f05ec0c"
+    },
+    {
+      "path": "subset_julia_vm_web_bg.wasm",
+      "sha256": "4b4e4613382444e25fa41500e7fcbfa2c29c8af8149b047077687e1097eb2353",
+      "size": 26217180
+    },
+    {
+      "path": "subset_julia_vm_web.d.ts",
+      "sha256": "fe88f56a6724411bc0b1c6823e49ec05c8670fda5f09bc28474a5d7c29c47df0"
+    },
+    {
+      "path": "subset_julia_vm_web_bg.wasm.d.ts",
+      "sha256": "7911c0c4b23e75578384f74399508edcac5c4518c4c63498a2aa84512d08fd87"
+    },
+    {
+      "path": "package.json",
+      "sha256": "5dbed22d3798525b13e0dcd1187a8ea32d521f4431f27326b776dabe41371e0c"
+    }
+  ]
+}

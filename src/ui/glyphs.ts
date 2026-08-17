@@ -1,0 +1,16 @@
+export const GLYPHS = [
+  { glyph: "▷", description: "apply: f(x)" },
+  { glyph: "🝡", description: "apply: f(x)" },
+  { glyph: "☽", description: "compose: f(g(x))" },
+  { glyph: "⊙", description: "elementwise multiply: a .* b" },
+  { glyph: "∅", description: "map f over x" },
+  { glyph: "✧", description: "fold left with f" },
+  { glyph: "⇉", description: "fan out: (f(x), g(x))" },
+  { glyph: "⚕", description: "replace nothing or NaN with a default" },
+  { glyph: "𓇬", description: "clamp values to 0 through 1" },
+  { glyph: "☿", description: "memoize a function" },
+  { glyph: "⚹", description: "unsupported in v0.12.2; hex neighbors" },
+  { glyph: "✦", description: "Cartesian product" },
+  { glyph: "☥", description: "deep copy" },
+  { glyph: "⚸", description: "accumulate with f" },
+] as const

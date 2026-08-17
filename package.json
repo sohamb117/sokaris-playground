@@ -1,0 +1,29 @@
+{
+  "name": "sokaris-playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -b",
+    "build": "tsc -b && vite build",
+    "check": "biome check .",
+    "preview": "vite preview --host 127.0.0.1",
+    "vendor": "vitest run tests/vendor-manifest.test.ts",
+    "loc": "bun run scripts/check-loc.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@playwright/test": "^1.55.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@types/bun": "^1.2.20",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.2",
+    "vitest": "^4.1.6"
+  }
+}

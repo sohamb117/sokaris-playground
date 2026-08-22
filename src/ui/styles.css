@@ -19,7 +19,6 @@
     var(--help-dialog-block-inset)
   );
   --output-preview-width: 80%;
-  --output-preview-max-width: 640px;
   --output-preview-max-height: 80%;
   --font-mono:
     ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "DejaVu Sans Mono",
@@ -194,11 +193,12 @@ button:focus-visible,
 }
 
 .result-canvas {
-  width: min(var(--output-preview-width), var(--output-preview-max-width));
+  width: auto;
   height: auto;
+  max-width: var(--output-preview-width);
   max-height: var(--output-preview-max-height);
   object-fit: contain;
-  image-rendering: pixelated;
+  image-rendering: auto;
 }
 
 .error-alert {
@@ -252,8 +252,13 @@ button:focus-visible,
 
 .help-dialog p,
 .help-dialog h2,
+.help-dialog pre,
 .help-dialog dl {
   margin: 0 0 var(--space-4);
+}
+
+.help-dialog pre {
+  white-space: pre-wrap;
 }
 
 .help-dialog h2 {

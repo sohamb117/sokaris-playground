@@ -4,26 +4,29 @@ export class CanvasImageError extends Error {
   readonly name = "CanvasImageError"
 }
 
-export const toRgbaBytes = (image: RuntimeImage): Uint8ClampedArray => {
-  if (!Number.isInteger(image.width) || !Number.isInteger(image.height)) {
+export const toRgbaBytes = (value: unknown): Uint8ClampedArray => {
+  if (typeof value !== "object" || value === null) {
+    throw new CanvasImageError("Image data must be an object")
+  }
+  const width = "width" in value ? value.width : undefined
+  const height = "height" in value ? value.height : undefined
+  const data = "data" in value ? value.data : undefined
+  if (!(data instanceof Uint8ClampedArray)) {
+    throw new CanvasImageError("Image data must be a Uint8ClampedArray")
+  }
+  if (!Number.isInteger(width) || !Number.isInteger(height)) {
     throw new CanvasImageError("Image dimensions must be integers")
   }
   if (
-    image.width <= 0 ||
-    image.height <= 0 ||
-    image.data.length !== image.width * image.height * 4
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    width <= 0 ||
+    height <= 0 ||
+    data.length !== width * height * 4
   ) {
     throw new CanvasImageError("Image dimensions do not match channel count")
   }
-  const bytes = new Uint8ClampedArray(image.data.length)
-  for (let index = 0; index < image.data.length; index += 1) {
-    const channel = image.data[index]
-    if (channel === undefined || !Number.isFinite(channel) || channel < 0 || channel > 1) {
-      throw new CanvasImageError("Image channels must be finite values from 0 to 1")
-    }
-    bytes[index] = Math.round(channel * 255)
-  }
-  return bytes
+  return data
 }
 
 export const paintImage = (canvas: HTMLCanvasElement, image: RuntimeImage): void => {

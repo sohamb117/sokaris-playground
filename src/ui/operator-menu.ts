@@ -11,23 +11,29 @@ export class OperatorMenu {
   private shiftPending = false
 
   constructor(private readonly options: MenuOptions) {
-    options.textarea.addEventListener("keydown", this.onTextareaKeydown)
-    options.textarea.addEventListener("keyup", this.onTextareaKeyup)
+    window.addEventListener("keydown", this.onWindowKeydown)
+    window.addEventListener("keyup", this.onWindowKeyup)
+    window.addEventListener("blur", this.cancelShift)
+    options.textarea.addEventListener("blur", this.cancelShift)
   }
 
-  private readonly onTextareaKeydown = (event: KeyboardEvent): void => {
+  private readonly onWindowKeydown = (event: KeyboardEvent): void => {
     if (event.key === "Shift" && !event.repeat) {
-      this.shiftPending = true
+      this.shiftPending = document.activeElement === this.options.textarea
       return
     }
-    if (event.shiftKey) this.shiftPending = false
+    if (this.shiftPending) this.shiftPending = false
   }
 
-  private readonly onTextareaKeyup = (event: KeyboardEvent): void => {
+  private readonly onWindowKeyup = (event: KeyboardEvent): void => {
     if (event.key !== "Shift" || !this.shiftPending) return
     event.preventDefault()
     this.shiftPending = false
     this.open()
+  }
+
+  private readonly cancelShift = (): void => {
+    this.shiftPending = false
   }
 
   private open(): void {
@@ -109,7 +115,9 @@ export class OperatorMenu {
 
   dispose(): void {
     this.close(false)
-    this.options.textarea.removeEventListener("keydown", this.onTextareaKeydown)
-    this.options.textarea.removeEventListener("keyup", this.onTextareaKeyup)
+    window.removeEventListener("keydown", this.onWindowKeydown)
+    window.removeEventListener("keyup", this.onWindowKeyup)
+    window.removeEventListener("blur", this.cancelShift)
+    this.options.textarea.removeEventListener("blur", this.cancelShift)
   }
 }

@@ -1,3 +1,4 @@
+import { loadStarterImage } from "../examples/load-starter-image.ts"
 import { paintImage } from "./canvas-painter.ts"
 import { Debouncer } from "./debouncer.ts"
 import { createPlaygroundDom, type PlaygroundDom } from "./dom.ts"
@@ -23,6 +24,7 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
   root.replaceChildren(dom.main)
   const runtime = createRuntimeClient()
   const registry = new ImageRegistry()
+  const starterImage = loadStarterImage()
   const debouncer = new Debouncer(300)
   let ready = false
   let disposed = false
@@ -51,7 +53,11 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
     const run = latestRun + 1
     latestRun = run
     showBusy()
-    const result = await runtime.run({ source: dom.textarea.value, images: registry.list() })
+    const activeImage = registry.active()
+    const result = await runtime.run({
+      source: dom.textarea.value,
+      images: activeImage === undefined ? [] : [activeImage],
+    })
     if (disposed || run !== latestRun || result.kind === "stale") return
     finishBusy()
     if (result.kind === "error") {
@@ -121,9 +127,11 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
   const menu = new OperatorMenu({ textarea: dom.textarea, onInsert: schedule })
   const help = new HelpDialog(dom.helpTrigger, dom.outputPane)
 
-  void runtime.ready.then(
-    () => {
+  void Promise.all([runtime.ready, starterImage]).then(
+    ([, image]) => {
       if (disposed) return
+      registry.replace([image])
+      renderFiles(dom, registry)
       ready = true
       dom.loading.hidden = true
       void execute()

@@ -1,6 +1,18 @@
-import { SUPPORTED_TRANSFORMS } from "../runtime/transform-catalog.ts"
-import { UNSUPPORTED_TRANSFORMS } from "../runtime/unsupported-source.ts"
+import { STARTER_SOURCE } from "../examples/starter.ts"
 import { GLYPHS } from "./glyphs.ts"
+import { COMPILER_REFERENCE, PROGRAM_RULES, RUNTIME_LIMITS } from "./help-content.ts"
+
+const heading = (text: string): HTMLHeadingElement => {
+  const node = document.createElement("h2")
+  node.textContent = text
+  return node
+}
+
+const paragraph = (text: string): HTMLParagraphElement => {
+  const node = document.createElement("p")
+  node.textContent = text
+  return node
+}
 
 export class HelpDialog {
   private dialog: HTMLElement | undefined
@@ -23,21 +35,11 @@ export class HelpDialog {
     dialog.setAttribute("role", "dialog")
     dialog.setAttribute("aria-label", "Sokaris compositor help")
 
-    const intro = document.createElement("p")
-    intro.textContent = "SubsetJuliaVM is a Julia subset, not full Julia."
-    const workflow = document.createElement("p")
-    workflow.textContent =
-      'Drop images to register exact filenames for load("name"). Images become a maximum 32×32 VM working preview because SubsetJuliaVM cannot practically parse full-resolution numeric image literals. Assign the final value to result. Source edits and valid image changes auto-run after 300ms.'
-    const transformHeading = document.createElement("h2")
-    transformHeading.textContent = "Supported transforms"
-    const transforms = document.createElement("p")
-    transforms.textContent = SUPPORTED_TRANSFORMS.join(", ")
-    const unsupportedHeading = document.createElement("h2")
-    unsupportedHeading.textContent = "Not supported in v0.12.2"
-    const unsupported = document.createElement("p")
-    unsupported.textContent = UNSUPPORTED_TRANSFORMS.filter((name) => name !== "save").join(", ")
-    const glyphHeading = document.createElement("h2")
-    glyphHeading.textContent = "Compositor glyphs"
+    const starter = document.createElement("pre")
+    starter.textContent = STARTER_SOURCE
+    const compilerDetails = COMPILER_REFERENCE.map((entry) =>
+      paragraph(`${entry.signature} — ${entry.description}`),
+    )
     const glyphList = document.createElement("dl")
     for (const entry of GLYPHS) {
       const row = document.createElement("div")
@@ -50,14 +52,16 @@ export class HelpDialog {
       glyphList.append(row)
     }
     dialog.append(
-      intro,
-      workflow,
-      transformHeading,
-      transforms,
-      unsupportedHeading,
-      unsupported,
-      glyphHeading,
+      heading("Quick start"),
+      starter,
+      heading("Program rules"),
+      paragraph(PROGRAM_RULES.join(" ")),
+      heading("Compiler subset"),
+      ...compilerDetails,
+      heading("Compositor glyphs"),
       glyphList,
+      heading("Runtime limits"),
+      paragraph(RUNTIME_LIMITS.join(" ")),
     )
     this.outputPane.append(dialog)
     this.dialog = dialog

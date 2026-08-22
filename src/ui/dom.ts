@@ -1,3 +1,5 @@
+import { STARTER_SOURCE } from "../examples/starter.ts"
+
 const element = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string) => {
   const node = document.createElement(tag)
   node.className = className
@@ -47,7 +49,7 @@ export const createPlaygroundDom = (): PlaygroundDom => {
   const textarea = element("textarea", "code-editor")
   textarea.setAttribute("aria-label", "Sokaris code")
   textarea.spellcheck = false
-  textarea.value = "result = 21 ▷ (x -> x * 2)"
+  textarea.value = STARTER_SOURCE
   codePane.append(textarea)
 
   const footer = element("footer", "help-footer")

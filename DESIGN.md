@@ -92,7 +92,6 @@ All spacing derives from a 4px base unit.
 | `--help-dialog-width` | `min(max width, available output width)` | Help width resolved inside its structural host |
 | `--help-dialog-max-height` | `available output height` | Help height ceiling after both block insets |
 | `--output-preview-width` | `80%` | Result canvas display target within the output pane |
-| `--output-preview-max-width` | `640px` | Result canvas display-width ceiling |
 | `--output-preview-max-height` | `80%` | Result canvas display-height ceiling within the output pane |
 
 ### Rules
@@ -133,12 +132,14 @@ All spacing derives from a 4px base unit.
   selection target and drop target for multiple `image/*` files. Its inset is
   `12px`; instructional copy uses the caption token. It lists accepted files by
   exact filename in insertion order and contains no remove, rename, or action
-  control. A later valid duplicate replaces data without moving the name.
-- `ImageDecodeBoundary`: each accepted image is proportionally rasterized,
-  without upscaling, into a maximum `32×32` VM working preview before normalized
-  row-major RGBA extraction. This is input rasterization only; all transforms
-  remain VM-side. The bound exists because SubsetJuliaVM cannot practically
-  parse full-resolution numeric image literals.
+  control. The initial registry contains the bundled project-owned `input.png`,
+  decoded through `ImageDecodeBoundary`; a later valid duplicate replaces data
+  without moving the name.
+- `ImageDecodeBoundary`: each accepted image is decoded at native dimensions
+  with no rescale into row-major `Uint8ClampedArray` RGBA bytes. Browser decode
+  disables color-space conversion, alpha premultiplication, and orientation.
+  The most recently inserted or replaced registry image is active; list order
+  remains unchanged and only the active image reaches the compiler.
 - States: expanded-empty, expanded-populated, collapsed, drag-target, and
   decode-error. Drag-target uses immediate color inversion only. Decode errors
   are rendered by the shared output alert and do not mutate this pane.
@@ -148,8 +149,12 @@ All spacing derives from a 4px base unit.
 - `CodeEditor`: one native `textarea` labelled `Sokaris code`, filling the code
   row with `16px` inset, body typography, black surface, white text, square
   corners, and no internal border. Native selection and caret behavior remain
-  intact. Focus is communicated by a `2px` white inset rule. Source edits queue
-  one auto-run `300ms` after the latest edit; there is no Run control.
+  intact. Its mount value is the raw bundled `starter.jl` source,
+  the raw `starter.jl` helper plus `main!(pixels::Vector{UInt8})` loop, and is
+  never rewritten after mount. Focus is communicated by a `2px` white inset
+  rule. Source edits queue one auto-run `300ms` after the latest edit; there is
+  no Run control. Runtime readiness and starter-image decoding must both settle
+  before the initial execution; either failure appears in `ErrorAlert`.
 - `HelpFooter`: exactly `36px` high with `8px` horizontal inset and a `4px` gap.
   It contains only a native `HelpTrigger` button whose visible text is `?` and
   accessible name is `Open Sokaris help`, followed by the exact caption
@@ -162,10 +167,14 @@ All spacing derives from a 4px base unit.
 ### Floating surfaces
 
 - `OperatorMenu`: a fixed-position `role="menu"` opened only by standalone,
-  nonrepeating Shift while the textarea is focused. Its left edge begins at the
-  measured textarea caret and is clamped to a `4px` viewport inset; its top edge
-  begins below the caret by one body line and flips above when required. It has
-  a `1px` white border, black surface, and no shadow. The exact 14 native
+  nonrepeating Shift whose initial keydown occurs while the textarea owns
+  `document.activeElement`. One window-level keydown/keyup pair handles the full
+  sequence so cross-target keyup delivery works without bubbling duplicates;
+  any non-Shift key while held, textarea blur, or window blur cancels it, and all
+  listeners are removed on disposal. Its left edge begins at the measured
+  textarea caret and is clamped to a `4px` viewport inset; its top edge begins
+  below the caret by one body line and flips above when required. It has a `1px`
+  white border, black surface, and no shadow. The exact 14 native
   `button[role="menuitem"]` rows are `28px` high with `8px` horizontal inset.
   Keyboard focus inverts one row and therefore identifies the exact Enter
   target. Hover on any other row remains black with white underlined text, so a
@@ -177,26 +186,28 @@ All spacing derives from a 4px base unit.
   block insets, width, and maximum height use the declared help tokens. The
   surface therefore stays inside the output half of the `1024px` desktop canvas
   and cannot intersect the code textarea when an 800px or 900px viewport scrolls
-  horizontally. It scrolls internally when needed and uses a `1px` white border,
+  horizontally. It scrolls internally when needed; structured documentation may
+  extend beyond one viewport but every section remains reachable through native
+  scrolling. The surface uses a `1px` white border,
   `16px` inset, black surface, and body type. It has no close button; the same
-  `?`, Escape, or an outside pointer action closes it. `Supported transforms`
-  lists exactly the nine VM implementations. `Not supported in v0.12.2` lists
-  image operations rejected by the VM; runtime-only `save` is not described as
-  an image transform. Sections use `16px` separation and glyph rows use the 4px
-  spacing scale.
+  `?`, Escape, or an outside pointer action closes it. Typed help data generates
+  `Quick start` with the exact starter source, `Program rules`, `Compiler subset`
+  with supported typed helpers, loops, branches, and byte access,
+  `Compositor glyphs` with the exact 14 semantics, and `Runtime limits` covering
+  the Julia subset boundary, native resolution, source diagnostics, scalar
+  interpreter fallback, 10-second execution timeout, and 60-second compiler
+  initialization timeout. Sections use `16px` separation
+  and glyph rows use the 4px spacing scale.
 
 ### Canvas and error output
 
 - `ResultCanvas`: one native canvas centred in the output pane. Its internal
-  `width` and `height` attributes always remain the VM result dimensions, while
-  CSS scales only its displayed box to `--output-preview-width`, capped by
-  `--output-preview-max-width` and `--output-preview-max-height`. Display scaling
-  preserves the internal aspect ratio, remains fully contained in the pane, and
-  uses pixelated browser rendering so enlarged VM pixels remain crisp. It never
-  resamples ImageData or changes image transformation semantics. The
-  painter only accepts positive integer dimensions, exactly `width × height × 4`
-  normalized channels in `[0, 1]`, converts each channel with
-  `round(channel × 255)`, and calls `putImageData`. Image pixels are exempt from
+  `width` and `height` attributes always remain native result dimensions, while
+  CSS constrains its displayed box to 80% maximum width and height with automatic
+  aspect preservation and normal downscaling. It never resamples ImageData or
+  changes image transformation semantics. The painter only accepts positive
+  integer dimensions and exactly `width × height × 4` clamped RGBA bytes, then
+  calls `putImageData` directly. Image pixels are exempt from
   the UI palette; the surrounding stage remains black.
 - `ErrorAlert`: one minimal `role="alert"` with a `1px` white border, `12px`
   inset, body type, black surface, and white text. It uses `textContent`, never

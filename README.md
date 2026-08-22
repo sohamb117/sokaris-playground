@@ -11,49 +11,67 @@ Run `bun run dev`, open the local URL on a desktop viewport at least 1024px
 wide, and edit the native code textarea. Source changes auto-run 300ms after the
 last edit; there is no manual Run control.
 
-The default program works without an image:
+The default program mutates the bundled starter image after the local compiler is
+ready:
 
 ```julia
-result = 21 ▷ (x -> x * 2)
+function invert(value::UInt8)::UInt8
+    return UInt8(255 - value)
+end
+
+function main!(pixels::Vector{UInt8})
+    index = 1
+    channel = 1
+    while index <= length(pixels)
+        if channel < 4
+            pixels[index] = invert(pixels[index])
+        end
+        channel = channel + 1
+        if channel == 5
+            channel = 1
+        end
+        index = index + 1
+    end
+end
 ```
 
-Expand the Images pane to drop or select one or more image files. Filenames are
-registered exactly as shown, so an image can be loaded and transformed with:
+`src/assets/input.png` is copied exactly from the project-owned sibling source
+`../sokaris/inputs/input.png`. Vite ships it as a static asset, and the app
+decodes it through the same browser image boundary used for selected files.
 
-```julia
-result = load("photo.png") ▷ invert
-```
-
-Each image is proportionally rasterized, without upscaling, into a maximum
-32×32 VM working preview because SubsetJuliaVM cannot practically parse
-full-resolution numeric image literals.
+Expand the Images pane to drop or select one or more image files. The file list
+keeps insertion order, while the most recently inserted or replaced image becomes
+active. The compiler receives only that active image as native row-major RGBA
+bytes. Programs define `main!(pixels::Vector{UInt8})` and mutate those bytes in
+place; unsupported compiler constructs produce source diagnostics.
 
 Press standalone Shift while the editor is focused to open the 14-glyph
 compositor menu. Use pointer selection or ArrowUp, ArrowDown, Home, End, and
 Enter; Escape, Tab, or an outside click dismisses it. The `?` button opens help
-for image loading, `result`, transforms, and glyph meanings.
+for the compiler contract, supported language constructs, scalar fallback, and
+glyph meanings.
 
 ## Runtime boundary
 
-Sokaris runs locally in the browser on **SubsetJuliaVM v0.12.2**, a Rust/Wasm
-implementation of a Julia subset. It is **not full Julia** and must never be
-described or presented as full Julia compatibility. There is no backend or
-network evaluator.
+Sokaris compiles a typed Julia subset locally to WebAssembly. It is **not full
+Julia** and must never be described or presented as full Julia compatibility.
+There is no backend or network evaluator.
 
-The immutable package from `terasakisatoshi/subset_julia` commit
+The compiler package under `src/vendor/subset-julia-compiler/` is pinned by a
+separate manifest that records source-project identity, compiler package ABI 3, generated
+memory ABI 1, all artifact SHA-256 digests, and the exact `25,535,749`-byte Wasm
+size. The immutable scalar interpreter package from `terasakisatoshi/subset_julia` commit
 `561587e7a6f3914a24afd883a0dba52d51f3453d` is bundled under
 `src/vendor/subset-julia/`. `bun run vendor` verifies all five SHA-256 digests and
 the exact `26,217,180`-byte Wasm size.
 
-Browser images are decoded locally into the maximum 32×32 VM working preview as
-normalized row-major RGBA data. This is input rasterization only: image
-transforms execute in VM-side Julia source. TypeScript decodes and marshals
-inputs, controls worker lifecycle, validates output pixels, and paints the
-canvas. Supported transforms are `invert`, `gamma`, `brightness`, `contrast`,
-`grayscale`, `posterize`, `threshold`, `solarize`, and `pixelate`. Other known
-Imhotep operations return an explicit SubsetJuliaVM error. Of the 14 Sokaris
-glyphs, 13 are runtime-probed; `⚹` is explicitly unsupported because this VM
-does not implement the sibling definition's `checkbounds` call.
+Browser images are decoded locally at native dimensions into row-major
+`Uint8ClampedArray` RGBA bytes. The compiler worker validates generated Wasm,
+caches up to 32 modules by source and ABI, writes ABI v1 descriptors, executes
+the exact `main!` export, copies output bytes, and paints them without a JavaScript
+pixel transform. Source without `main!` uses the interpreter only for scalar
+compatibility; source containing `load(` receives migration guidance instead of
+silent fallback. Runs stop after 10 seconds and compiler initialization after 60.
 
 ## Toolchain
 
@@ -62,7 +80,7 @@ does not implement the sibling definition's `checkbounds` call.
 - strict TypeScript project references
 - Biome formatting and linting
 - Vitest with jsdom and Testing Library DOM
-- Playwright with Google Chrome stable against the production preview
+- Playwright with Google Chrome stable and Firefox against the production preview
 
 ## Commands
 
@@ -77,6 +95,7 @@ bun run vendor
 bun run loc
 ```
 
-`bun run test:e2e` builds and exercises the complete UI and hidden runtime
-harness against the local production preview. Runtime requests remain
-same-origin; there is no backend or external evaluator.
+`bun run test:e2e` exercises the complete UI and hidden runtime harness in Chrome,
+plus Shift, starter, help, and core compatibility coverage in Firefox. Runtime
+requests remain same-origin static assets; there is no backend or external
+evaluator.

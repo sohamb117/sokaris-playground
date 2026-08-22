@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { marshalImageBindings } from "../src/runtime/image-source.ts"
-import { decodeImage, previewSize } from "../src/ui/image-decoder.ts"
+import { decodeImage } from "../src/ui/image-decoder.ts"
 
 const originalCreateImageBitmap = Object.getOwnPropertyDescriptor(globalThis, "createImageBitmap")
 const originalGetContext = Object.getOwnPropertyDescriptor(
@@ -23,19 +22,18 @@ afterEach(() => {
 })
 
 describe("browser image decoding", () => {
-  it("bounds an 800x768 image before marshalling VM numeric literals", async () => {
+  it("returns native dimensions and exact RGBA bytes", async () => {
     // Given
     const close = vi.fn()
     const drawImage = vi.fn()
+    const pixels = new Uint8ClampedArray([0, 64, 128, 255, 1, 65, 129, 254])
     const context = {
       drawImage,
-      getImageData: vi.fn((_x: number, _y: number, width: number, height: number) => ({
-        data: new Uint8ClampedArray(width * height * 4),
-      })),
+      getImageData: vi.fn(() => ({ data: pixels })),
     }
     Object.defineProperty(globalThis, "createImageBitmap", {
       configurable: true,
-      value: vi.fn(async () => ({ width: 800, height: 768, close })),
+      value: vi.fn(async () => ({ width: 2, height: 1, close })),
     })
     Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
       configurable: true,
@@ -44,41 +42,37 @@ describe("browser image decoding", () => {
 
     // When
     const image = await decodeImage(new File(["png"], "normal.png", { type: "image/png" }))
-    const binding = marshalImageBindings([image])
-
     // Then
-    expect(image).toMatchObject({ width: 32, height: 31 })
-    expect(image.data).toHaveLength(32 * 31 * 4)
-    expect(binding.length).toBeLessThan(20_000)
-    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 32, 31)
+    expect(image).toEqual({ filename: "normal.png", width: 2, height: 1, data: pixels })
+    expect(image.data).toBeInstanceOf(Uint8ClampedArray)
+    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0)
     expect(close).toHaveBeenCalledOnce()
   })
 
-  it.each([
-    { source: { width: 800, height: 768 }, target: { width: 32, height: 31 } },
-    { source: { width: 768, height: 800 }, target: { width: 31, height: 32 } },
-    { source: { width: 400, height: 400 }, target: { width: 32, height: 32 } },
-    { source: { width: 24, height: 16 }, target: { width: 24, height: 16 } },
-  ])("fits $source into the VM preview as $target", ({ source, target }) => {
-    // Given / When
-    const size = previewSize(source.width, source.height)
+  it("requests browser-neutral decode options", async () => {
+    // Given
+    const createBitmap = vi.fn(async () => ({ width: 1, height: 1, close: vi.fn() }))
+    Object.defineProperty(globalThis, "createImageBitmap", {
+      configurable: true,
+      value: createBitmap,
+    })
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+      configurable: true,
+      value: vi.fn(() => ({
+        drawImage: vi.fn(),
+        getImageData: vi.fn(() => ({ data: new Uint8ClampedArray(4) })),
+      })),
+    })
+    const file = new File(["png"], "native.png", { type: "image/png" })
+
+    // When
+    await decodeImage(file)
 
     // Then
-    expect(size).toEqual(target)
-  })
-
-  it.each([
-    [0, 1],
-    [1, 0],
-    [-1, 1],
-    [1.5, 1],
-    [Number.NaN, 1],
-    [1, Number.POSITIVE_INFINITY],
-  ])("rejects invalid source dimensions %s x %s", (width, height) => {
-    // Given / When
-    const size = () => previewSize(width, height)
-
-    // Then
-    expect(size).toThrow("Image dimensions must be positive safe integers")
+    expect(createBitmap).toHaveBeenCalledWith(file, {
+      colorSpaceConversion: "none",
+      premultiplyAlpha: "none",
+      imageOrientation: "none",
+    })
   })
 })

@@ -70,7 +70,8 @@ end`)
 
     // Then
     expect(diagnostic).toContain("unsupported")
-    expect(diagnostic).toContain("String")
+    expect(diagnostic).toContain("Convert")
+    expect(diagnostic).toContain("target_ty: Str")
   })
 
   it("preserves UInt8 wrapping and unsigned widening in the shipped compiler", async () => {

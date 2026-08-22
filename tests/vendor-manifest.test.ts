@@ -47,11 +47,11 @@ describe("SubsetJuliaVM vendor manifest", () => {
       package: "subset_julia_vm_web",
       version: "0.11.1",
       compilerAbiVersion: 3,
-      generatedMemoryAbiVersion: 1,
+      generatedMemoryAbiVersion: 2,
     })
     expect(actual.map(({ path, sha256 }) => ({ path, sha256 }))).toEqual(
       compilerManifest.files.map(({ path, sha256 }) => ({ path, sha256 })),
     )
-    expect(actual.find((file) => file.path.endsWith(".wasm"))?.size).toBe(25_540_486)
+    expect(actual.find((file) => file.path.endsWith(".wasm"))?.size).toBe(26_810_214)
   })
 })

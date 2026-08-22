@@ -105,7 +105,7 @@ end`,
     ),
   ).resolves.toMatchObject({
     kind: "error",
-    message: expect.stringContaining("String"),
+    message: expect.stringContaining("target_ty: Str"),
   })
 })
 

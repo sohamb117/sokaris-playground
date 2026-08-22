@@ -150,7 +150,7 @@ test("runs the active dropped image repeatedly and retains the last canvas on di
 end`)
 
   // Then
-  await expect(page.getByRole("alert")).toContainText("String", { timeout: 30_000 })
+  await expect(page.getByRole("alert")).toContainText("target_ty: Str", { timeout: 30_000 })
   await expect(canvas).toBeVisible()
   const outputBox = await page.locator("[data-output-pane]").boundingBox()
   const alertBox = await page.getByRole("alert").boundingBox()

@@ -71,7 +71,8 @@ describe("generated image ABI", () => {
       next = Math.ceil(next / alignment) * alignment
       const pointer = next
       next += Number(size)
-      if (memory.buffer.byteLength < next) memory.grow(Math.ceil((next - memory.buffer.byteLength) / 65_536))
+      if (memory.buffer.byteLength < next)
+        memory.grow(Math.ceil((next - memory.buffer.byteLength) / 65_536))
       return pointer
     })
     const free = vi.fn()

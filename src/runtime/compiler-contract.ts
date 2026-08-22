@@ -121,7 +121,8 @@ export const executeCompiledImage = async (
   try {
     new Uint8Array(memory.buffer, pixelPointer, image.data.length).set(image.data)
     descriptorPointer = Number(allocate(BigInt(DESCRIPTOR_BYTES), 8))
-    if (descriptorPointer === 0) throw new TypeError("Compiled module could not allocate image descriptor")
+    if (descriptorPointer === 0)
+      throw new TypeError("Compiled module could not allocate image descriptor")
     const descriptor = new DataView(memory.buffer, descriptorPointer, DESCRIPTOR_BYTES)
     descriptor.setUint32(0, 2, true)
     descriptor.setUint32(4, 1, true)

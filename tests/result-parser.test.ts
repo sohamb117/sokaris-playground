@@ -17,7 +17,7 @@ describe("sentinel image parser", () => {
     expect(result).toEqual({
       width: 2,
       height: 1,
-      data: new Float64Array([1, 0, 0, 1, 0, 1, 0, 1]),
+      data: new Uint8ClampedArray([255, 0, 0, 255, 0, 255, 0, 255]),
     })
   })
 

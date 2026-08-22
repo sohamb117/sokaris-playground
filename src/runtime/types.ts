@@ -2,7 +2,7 @@ export type BrowserImageSource = {
   readonly filename: string
   readonly width: number
   readonly height: number
-  readonly data: Float64Array
+  readonly data: Uint8ClampedArray
 }
 
 export type RuntimeRequest = {
@@ -13,7 +13,7 @@ export type RuntimeRequest = {
 export type RuntimeImage = {
   readonly width: number
   readonly height: number
-  readonly data: Float64Array
+  readonly data: Uint8ClampedArray
 }
 
 export type RuntimeResult =

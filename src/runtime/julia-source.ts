@@ -1,8 +1,7 @@
 import { RuntimeContractError } from "./errors.ts"
 import { GLYPH_SOURCE } from "./glyph-source.ts"
 import { IMAGE_RUNTIME_SOURCE } from "./image-runtime-source.ts"
-import { marshalImageBindings } from "./image-source.ts"
-import type { BrowserImageSource } from "./types.ts"
+import { marshalImageBindings, type NormalizedImageSource } from "./image-source.ts"
 import { UNSUPPORTED_SOURCE } from "./unsupported-source.ts"
 
 export { GLYPH_SOURCE, IMAGE_RUNTIME_SOURCE }
@@ -32,7 +31,7 @@ export const validateRuntimeSource = (userSource: string): void => {
 
 export const composeRuntimeSource = (
   userSource: string,
-  images: readonly BrowserImageSource[],
+  images: readonly NormalizedImageSource[],
 ): string => {
   validateRuntimeSource(userSource)
   return [

@@ -1,54 +1,12 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { RUNTIME_TIMEOUT_MESSAGE, RuntimeController } from "../src/runtime/controller.ts"
-import type {
-  RuntimeWorkerFactory,
-  RuntimeWorkerLike,
-  WorkerResponse,
-} from "../src/runtime/protocol.ts"
-
-class FakeWorker implements RuntimeWorkerLike {
-  readonly posted: unknown[] = []
-  readonly transfers: Transferable[][] = []
-  readonly terminated = vi.fn()
-  private listener: ((event: MessageEvent<unknown>) => void) | undefined
-
-  postMessage(message: unknown, transfer: Transferable[] = []): void {
-    this.posted.push(message)
-    this.transfers.push(transfer)
-  }
-
-  addEventListener(_type: "message", listener: (event: MessageEvent<unknown>) => void): void {
-    this.listener = listener
-  }
-
-  removeEventListener(_type: "message", listener: (event: MessageEvent<unknown>) => void): void {
-    if (this.listener === listener) this.listener = undefined
-  }
-
-  terminate(): void {
-    this.terminated()
-  }
-
-  respond(response: WorkerResponse): void {
-    this.listener?.(new MessageEvent("message", { data: response }))
-  }
-}
-
-const createWorkerFactory = (): {
-  readonly factory: RuntimeWorkerFactory
-  readonly workers: FakeWorker[]
-} => {
-  const workers: FakeWorker[] = []
-  return {
-    workers,
-    factory: () => {
-      const worker = new FakeWorker()
-      workers.push(worker)
-      return worker
-    },
-  }
-}
+import {
+  RUNTIME_INITIALIZATION_TIMEOUT_MESSAGE,
+  RUNTIME_TIMEOUT_MESSAGE,
+  RuntimeController,
+} from "../src/runtime/controller.ts"
+import type { RuntimeWorkerFactory } from "../src/runtime/protocol.ts"
+import { createWorkerFactory, type FakeWorker } from "./support/fake-worker.ts"
 
 const readyController = async (
   factory: RuntimeWorkerFactory,
@@ -119,27 +77,33 @@ describe("runtime controller", () => {
     // Given
     const { factory, workers } = createWorkerFactory()
     const { controller, worker } = await readyController(factory, workers)
-    const data = new Float64Array([0, 0.25, 0.5, 1])
+    const data = new Uint8ClampedArray([0, 64, 128, 255])
     const request = { images: [{ filename: "pixel.png", width: 1, height: 1, data }] }
 
     // When
-    const first = controller.run({ ...request, source: 'result = load("pixel.png")' })
+    const source = "function main!(pixels::Vector{UInt8})\nend"
+    const first = controller.run({ ...request, source })
     worker.respond({
       kind: "result",
       runId: 1,
-      result: { kind: "image", width: 1, height: 1, data: new Float64Array(data) },
+      result: { kind: "image", width: 1, height: 1, data: new Uint8ClampedArray(data) },
     })
     await first
-    const second = controller.run({ ...request, source: 'result = load("pixel.png") ▷ invert' })
+    const second = controller.run({ ...request, source })
     worker.respond({
       kind: "result",
       runId: 2,
-      result: { kind: "image", width: 1, height: 1, data: new Float64Array([1, 0.75, 0.5, 1]) },
+      result: {
+        kind: "image",
+        width: 1,
+        height: 1,
+        data: new Uint8ClampedArray([255, 191, 128, 255]),
+      },
     })
 
     // Then
     await expect(second).resolves.toMatchObject({ kind: "image" })
-    expect(data.byteLength).toBe(32)
+    expect(data.byteLength).toBe(4)
     expect(worker.transfers).toHaveLength(2)
     expect(worker.transfers[0]?.[0]).not.toBe(data.buffer)
     expect(worker.transfers[1]?.[0]).not.toBe(data.buffer)
@@ -157,6 +121,134 @@ describe("runtime controller", () => {
     // Then
     await expect(controller.ready).rejects.toThrow("Wasm initialization failed exactly")
     expect(worker?.terminated).toHaveBeenCalledOnce()
+  })
+
+  it("rejects ready and terminates when the worker script emits an error before ready", async () => {
+    // Given
+    const { factory, workers } = createWorkerFactory()
+    const controller = new RuntimeController(factory)
+    const worker = workers[0]
+
+    // When
+    worker?.fail("Worker script failed to load exactly")
+
+    // Then
+    await expect(controller.ready).rejects.toThrow("Worker script failed to load exactly")
+    expect(worker?.terminated).toHaveBeenCalledOnce()
+  })
+
+  it("uses the worker load fallback when the error message is empty", async () => {
+    // Given
+    const { factory, workers } = createWorkerFactory()
+    const controller = new RuntimeController(factory)
+
+    // When
+    workers[0]?.fail()
+
+    // Then
+    await expect(controller.ready).rejects.toThrow("Sokaris runtime worker failed to load.")
+  })
+
+  it("rejects ready and terminates when the worker emits messageerror before ready", async () => {
+    // Given
+    const { factory, workers } = createWorkerFactory()
+    const controller = new RuntimeController(factory)
+    const worker = workers[0]
+
+    // When
+    worker?.failMessage()
+
+    // Then
+    await expect(controller.ready).rejects.toThrow(
+      "Sokaris runtime worker message could not be decoded.",
+    )
+    expect(worker?.terminated).toHaveBeenCalledOnce()
+  })
+
+  it("rejects ready and a queued run when initialization exceeds 60 seconds", async () => {
+    // Given
+    vi.useFakeTimers()
+    const { factory, workers } = createWorkerFactory()
+    const controller = new RuntimeController(factory)
+    const worker = workers[0]
+    const ready = expect(controller.ready).rejects.toThrow(RUNTIME_INITIALIZATION_TIMEOUT_MESSAGE)
+    const pending = controller.run({ source: "result = 42", images: [] })
+
+    // When
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    // Then
+    await ready
+    await expect(pending).resolves.toEqual({
+      kind: "error",
+      message: RUNTIME_INITIALIZATION_TIMEOUT_MESSAGE,
+      output: "",
+    })
+    expect(worker?.terminated).toHaveBeenCalledOnce()
+    vi.useRealTimers()
+  })
+
+  it("restarts after a ready worker error and runs only the newest pending request after replacement ready", async () => {
+    // Given
+    const { factory, workers } = createWorkerFactory()
+    const { controller, worker } = await readyController(factory, workers)
+    const active = controller.run({ source: "result = runaway()", images: [] })
+    const superseded = controller.run({ source: "result = 2", images: [] })
+    const latest = controller.run({ source: "result = 777", images: [] })
+
+    // When
+    worker.fail("Worker crashed after ready")
+    const replacement = workers[1]
+
+    // Then
+    await expect(active).resolves.toEqual({
+      kind: "error",
+      message: "Worker crashed after ready",
+      output: "",
+    })
+    await expect(superseded).resolves.toEqual({ kind: "stale" })
+    expect(worker.terminated).toHaveBeenCalledOnce()
+    expect(replacement?.posted).toHaveLength(0)
+
+    // When
+    replacement?.respond({ kind: "ready", version: "0.12.2" })
+    replacement?.respond({
+      kind: "result",
+      runId: 3,
+      result: { kind: "scalar", value: 777, output: "" },
+    })
+
+    // Then
+    expect(replacement?.posted).toMatchObject([
+      { kind: "run", runId: 3, request: { source: "result = 777" } },
+    ])
+    await expect(latest).resolves.toEqual({ kind: "scalar", value: 777, output: "" })
+  })
+
+  it("stops after a recovery worker initialization deadline and settles pending work", async () => {
+    // Given
+    vi.useFakeTimers()
+    const { factory, workers } = createWorkerFactory()
+    const { controller, worker } = await readyController(factory, workers)
+    const active = controller.run({ source: "result = runaway()", images: [] })
+    const pending = controller.run({ source: "result = 777", images: [] })
+    worker.fail("Worker crashed after ready")
+    const replacement = workers[1]
+
+    // When
+    await vi.advanceTimersByTimeAsync(60_000)
+
+    // Then
+    await expect(active).resolves.toMatchObject({ kind: "error" })
+    await expect(pending).resolves.toEqual({
+      kind: "error",
+      message: RUNTIME_INITIALIZATION_TIMEOUT_MESSAGE,
+      output: "",
+    })
+    expect(replacement?.terminated).toHaveBeenCalledOnce()
+    expect(workers).toHaveLength(2)
+    controller.dispose()
+    vi.useRealTimers()
   })
 
   it("times out an active run, replaces its worker, and runs the latest request after ready", async () => {

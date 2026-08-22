@@ -12,7 +12,7 @@ const toSerializableResult = async (
       filename: image.filename,
       width: image.width,
       height: image.height,
-      data: new Float64Array(image.data),
+      data: new Uint8ClampedArray(image.data),
     })),
   })
   switch (result.kind) {

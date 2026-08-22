@@ -42,7 +42,11 @@ export const parseFinalImage = (output: string): RuntimeImage => {
   if (channels.some((channel) => !Number.isFinite(channel) || channel < 0 || channel > 1)) {
     throw new RuntimeContractError("Image sentinel channels must be finite values in [0, 1]")
   }
-  return { width, height, data: new Float64Array(channels) }
+  return {
+    width,
+    height,
+    data: new Uint8ClampedArray(channels.map((channel) => Math.round(channel * 255))),
+  }
 }
 
 export const parseExecutionResult = (raw: unknown): RuntimeResult => {

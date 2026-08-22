@@ -1,5 +1,11 @@
 import { RuntimeContractError } from "./errors.ts"
-import type { BrowserImageSource } from "./types.ts"
+
+export type NormalizedImageSource = {
+  readonly filename: string
+  readonly width: number
+  readonly height: number
+  readonly data: Float64Array
+}
 
 const escapeJuliaString = (value: string): string =>
   value
@@ -10,7 +16,7 @@ const escapeJuliaString = (value: string): string =>
     .replaceAll("\r", "\\r")
     .replaceAll("\t", "\\t")
 
-const validateImage = (image: BrowserImageSource): void => {
+const validateImage = (image: NormalizedImageSource): void => {
   if (!Number.isSafeInteger(image.width) || !Number.isSafeInteger(image.height)) {
     throw new RuntimeContractError("Image dimensions must be safe integers")
   }
@@ -27,7 +33,7 @@ const validateImage = (image: BrowserImageSource): void => {
   }
 }
 
-export const marshalImageBindings = (images: readonly BrowserImageSource[]): string => {
+export const marshalImageBindings = (images: readonly NormalizedImageSource[]): string => {
   const filenames = new Set<string>()
   const branches: string[] = []
   for (const image of images) {

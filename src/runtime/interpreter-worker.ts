@@ -49,7 +49,7 @@ const readImage = (value: unknown): BrowserImageSource => {
     typeof filename !== "string" ||
     typeof width !== "number" ||
     typeof height !== "number" ||
-    !(data instanceof Float64Array)
+    !(data instanceof Uint8ClampedArray)
   ) {
     throw new TypeError("Invalid browser image")
   }
@@ -70,7 +70,11 @@ globalThis.addEventListener("message", (event: MessageEvent<unknown>) => {
   if (runId === undefined) return
   try {
     const message = readRunRequest(event.data)
-    const source = composeRuntimeSource(message.request.source, message.request.images)
+    const images = message.request.images.map((image) => ({
+      ...image,
+      data: Float64Array.from(image.data, (channel) => channel / 255),
+    }))
+    const source = composeRuntimeSource(message.request.source, images)
     const result = parseExecutionResult(run_from_source_typed(source, 42n))
     const transfer = result.kind === "image" ? [result.data.buffer] : []
     post({ kind: "result", runId: message.runId, result }, transfer)

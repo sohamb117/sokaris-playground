@@ -1,29 +1,24 @@
 import { RuntimeContractError, RuntimeLifecycleError } from "./errors.ts"
-import { validateRuntimeSource } from "./julia-source.ts"
+import { parseWorkerResponse, type RuntimeWorkerFactory, type WorkerResponse } from "./protocol.ts"
 import {
-  parseWorkerResponse,
-  type RuntimeWorkerFactory,
-  type RuntimeWorkerLike,
-  type WorkerResponse,
-} from "./protocol.ts"
+  errorResult,
+  type PendingRun,
+  prepareWorkerRun,
+  RUNTIME_INITIALIZATION_TIMEOUT_MESSAGE,
+  RUNTIME_INITIALIZATION_TIMEOUT_MS,
+  RUNTIME_TIMEOUT_MESSAGE,
+  RUNTIME_TIMEOUT_MS,
+  RUNTIME_WORKER_MESSAGE_ERROR_MESSAGE,
+  workerLoadErrorMessage,
+} from "./runtime-lifecycle.ts"
+import { validateRoutableSource } from "./source-route.ts"
 import type { RuntimeRequest, RuntimeResult } from "./types.ts"
+import { createWorkerSession, retireWorkerSession, type WorkerSession } from "./worker-session.ts"
 
-export const RUNTIME_TIMEOUT_MESSAGE = "Sokaris execution timed out after 10 seconds."
-const RUNTIME_TIMEOUT_MS = 10_000
-
-type PendingRun = {
-  readonly runId: number
-  readonly request: RuntimeRequest
-  readonly resolve: (result: RuntimeResult) => void
-}
-
-type WorkerSession = {
-  readonly generation: number
-  readonly worker: RuntimeWorkerLike
-  readonly listener: (event: MessageEvent<unknown>) => void
-}
-
-const errorResult = (message: string): RuntimeResult => ({ kind: "error", message, output: "" })
+export {
+  RUNTIME_INITIALIZATION_TIMEOUT_MESSAGE,
+  RUNTIME_TIMEOUT_MESSAGE,
+} from "./runtime-lifecycle.ts"
 
 export class RuntimeController {
   readonly ready: Promise<void>
@@ -33,6 +28,7 @@ export class RuntimeController {
   private pending: PendingRun | undefined
   private session: WorkerSession | undefined
   private watchdog: ReturnType<typeof setTimeout> | undefined
+  private readinessTimer: ReturnType<typeof setTimeout> | undefined
   private resolveReady: () => void = () => undefined
   private rejectReady: (error: RuntimeLifecycleError) => void = () => undefined
   private readySettled = false
@@ -56,7 +52,7 @@ export class RuntimeController {
       return Promise.resolve(errorResult(this.unavailableMessage))
     }
     try {
-      validateRuntimeSource(request.source)
+      validateRoutableSource(request.source)
     } catch (error) {
       if (error instanceof RuntimeContractError) return Promise.resolve(errorResult(error.message))
       throw error
@@ -77,6 +73,7 @@ export class RuntimeController {
     if (this.disposed) return
     this.disposed = true
     this.clearWatchdog()
+    this.clearReadinessTimer()
     this.active?.resolve({ kind: "stale" })
     this.pending?.resolve({ kind: "stale" })
     this.active = undefined
@@ -90,12 +87,25 @@ export class RuntimeController {
       const worker = this.createWorker()
       const generation = this.nextGeneration
       this.nextGeneration += 1
-      const listener = (event: MessageEvent<unknown>): void => {
-        if (this.session?.generation === generation) this.handleMessage(event.data)
-      }
-      this.session = { generation, worker, listener }
+      this.session = createWorkerSession(worker, generation, {
+        onMessage: (raw) => {
+          if (this.session?.generation === generation) this.handleMessage(raw)
+        },
+        onError: (event) => {
+          if (this.session?.generation === generation)
+            this.handleFatal(workerLoadErrorMessage(event))
+        },
+        onMessageError: () => {
+          if (this.session?.generation === generation) {
+            this.handleFatal(RUNTIME_WORKER_MESSAGE_ERROR_MESSAGE)
+          }
+        },
+      })
       this.workerReady = false
-      worker.addEventListener("message", listener)
+      this.readinessTimer = setTimeout(
+        () => this.handleInitializationTimeout(generation),
+        RUNTIME_INITIALIZATION_TIMEOUT_MS,
+      )
     } catch (error) {
       const message = error instanceof Error ? error.message : "Runtime worker creation failed"
       this.stopAfterFailure(message)
@@ -110,15 +120,8 @@ export class RuntimeController {
       return
     }
     this.active = run
-    const images = run.request.images.map((image) => ({
-      ...image,
-      data: new Float64Array(image.data),
-    }))
-    const transfer = images.map((image) => image.data.buffer)
-    session.worker.postMessage(
-      { kind: "run", runId: run.runId, request: { ...run.request, images } },
-      transfer,
-    )
+    const prepared = prepareWorkerRun(run)
+    session.worker.postMessage(prepared.message, prepared.transfer)
     const generation = session.generation
     this.watchdog = setTimeout(() => this.handleTimeout(run.runId, generation), RUNTIME_TIMEOUT_MS)
   }
@@ -149,6 +152,7 @@ export class RuntimeController {
   }
 
   private handleReady(): void {
+    this.clearReadinessTimer()
     this.workerReady = true
     this.recovering = false
     if (!this.hasBeenReady) {
@@ -183,6 +187,11 @@ export class RuntimeController {
     this.restartWorker(RUNTIME_TIMEOUT_MESSAGE)
   }
 
+  private handleInitializationTimeout(generation: number): void {
+    if (this.session?.generation !== generation || this.workerReady) return
+    this.handleFatal(RUNTIME_INITIALIZATION_TIMEOUT_MESSAGE)
+  }
+
   private handleFatal(message: string): void {
     if (!this.hasBeenReady) {
       this.stopAfterFailure(message)
@@ -197,6 +206,7 @@ export class RuntimeController {
 
   private restartWorker(message: string): void {
     this.clearWatchdog()
+    this.clearReadinessTimer()
     this.active?.resolve(errorResult(message))
     this.active = undefined
     this.retireWorker()
@@ -206,6 +216,7 @@ export class RuntimeController {
 
   private stopAfterFailure(message: string): void {
     this.clearWatchdog()
+    this.clearReadinessTimer()
     this.active?.resolve(errorResult(message))
     this.pending?.resolve(errorResult(message))
     this.active = undefined
@@ -233,12 +244,18 @@ export class RuntimeController {
     this.watchdog = undefined
   }
 
+  private clearReadinessTimer(): void {
+    if (this.readinessTimer === undefined) return
+    clearTimeout(this.readinessTimer)
+    this.readinessTimer = undefined
+  }
+
   private retireWorker(): void {
+    this.clearReadinessTimer()
     const session = this.session
     if (session === undefined) return
     this.session = undefined
     this.workerReady = false
-    session.worker.removeEventListener("message", session.listener)
-    session.worker.terminate()
+    retireWorkerSession(session)
   }
 }

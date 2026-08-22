@@ -7,7 +7,7 @@ export type WorkerRunRequest = {
 }
 
 export type WorkerResponse =
-  | { readonly kind: "ready"; readonly version: "0.12.2" }
+  | { readonly kind: "ready"; readonly version: string }
   | { readonly kind: "result"; readonly runId: number; readonly result: RuntimeResult }
   | {
       readonly kind: "run-error"
@@ -20,7 +20,11 @@ export type WorkerResponse =
 export interface RuntimeWorkerLike {
   postMessage(message: unknown, transfer?: Transferable[]): void
   addEventListener(type: "message", listener: (event: MessageEvent<unknown>) => void): void
+  addEventListener(type: "error", listener: (event: ErrorEvent) => void): void
+  addEventListener(type: "messageerror", listener: (event: MessageEvent<unknown>) => void): void
   removeEventListener(type: "message", listener: (event: MessageEvent<unknown>) => void): void
+  removeEventListener(type: "error", listener: (event: ErrorEvent) => void): void
+  removeEventListener(type: "messageerror", listener: (event: MessageEvent<unknown>) => void): void
   terminate(): void
 }
 
@@ -52,7 +56,11 @@ const parseRuntimeResult = (value: unknown): RuntimeResult => {
     const width = readProperty(value, "width")
     const height = readProperty(value, "height")
     const data = readProperty(value, "data")
-    if (typeof width === "number" && typeof height === "number" && data instanceof Float64Array) {
+    if (
+      typeof width === "number" &&
+      typeof height === "number" &&
+      data instanceof Uint8ClampedArray
+    ) {
       return { kind, width, height, data }
     }
   }
@@ -61,8 +69,9 @@ const parseRuntimeResult = (value: unknown): RuntimeResult => {
 
 export const parseWorkerResponse = (value: unknown): WorkerResponse => {
   const kind = readProperty(value, "kind")
-  if (kind === "ready" && readProperty(value, "version") === "0.12.2") {
-    return { kind, version: "0.12.2" }
+  const version = readProperty(value, "version")
+  if (kind === "ready" && typeof version === "string" && version.length > 0) {
+    return { kind, version }
   }
   if (kind === "fatal" && typeof readProperty(value, "message") === "string") {
     const message = readProperty(value, "message")

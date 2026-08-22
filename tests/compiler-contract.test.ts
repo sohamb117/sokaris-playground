@@ -7,7 +7,7 @@ import {
 } from "../src/runtime/compiler-contract.ts"
 
 describe("compiler result contract", () => {
-  it("parses validated ABI v1 compiler bytes", () => {
+  it("parses validated ABI v2 compiler bytes", () => {
     // Given
     const bytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])
 
@@ -17,11 +17,11 @@ describe("compiler result contract", () => {
       wasm_bytes: bytes,
       diagnostics: [],
       compiler_version: "0.11.1",
-      abi_version: 1,
+      abi_version: 2,
     })
 
     // Then
-    expect(result).toEqual({ bytes, compilerVersion: "0.11.1", abiVersion: 1 })
+    expect(result).toEqual({ bytes, compilerVersion: "0.11.1", abiVersion: 2 })
   })
 
   it("rejects invalid success bytes", () => {
@@ -32,7 +32,7 @@ describe("compiler result contract", () => {
         wasm_bytes: new Uint8Array([1, 2, 3]),
         diagnostics: [],
         compiler_version: "0.11.1",
-        abi_version: 1,
+        abi_version: 2,
       })
 
     // Then
@@ -52,7 +52,7 @@ describe("compiler result contract", () => {
         },
       ],
       compiler_version: "0.11.1",
-      abi_version: 1,
+      abi_version: 2,
     }
 
     // When / Then
@@ -63,22 +63,40 @@ describe("compiler result contract", () => {
 })
 
 describe("generated image ABI", () => {
-  it("grows memory, writes ABI v1 descriptor, invokes main!, and copies output", async () => {
+  it("allocates an ABI v2 descriptor, invokes main!, copies output, and cleans up", async () => {
     // Given
     const memory = new WebAssembly.Memory({ initial: 1 })
+    let next = 64
+    const allocate = vi.fn((size: bigint, alignment: number) => {
+      next = Math.ceil(next / alignment) * alignment
+      const pointer = next
+      next += Number(size)
+      if (memory.buffer.byteLength < next) memory.grow(Math.ceil((next - memory.buffer.byteLength) / 65_536))
+      return pointer
+    })
+    const free = vi.fn()
+    const drop = vi.fn()
     const main = vi.fn((descriptorPointer: number) => {
-      const descriptor = new DataView(memory.buffer, descriptorPointer, 20)
-      expect(
-        Array.from({ length: 5 }, (_, index) => descriptor.getUint32(index * 4, true)),
-      ).toEqual([1, 64, 70_000, 1, 1])
-      new Uint8Array(memory.buffer, 64, 70_000).fill(42)
+      const descriptor = new DataView(memory.buffer, descriptorPointer, 56)
+      expect(descriptor.getUint32(0, true)).toBe(2)
+      expect(descriptor.getUint32(4, true)).toBe(1)
+      expect(descriptor.getUint32(8, true)).toBe(1)
+      expect(descriptor.getUint32(12, true)).toBe(1)
+      expect(descriptor.getUint32(20, true)).toBe(1)
+      expect(descriptor.getBigUint64(32, true)).toBe(70_000n)
+      expect(descriptor.getBigUint64(40, true)).toBe(70_000n)
+      expect(descriptor.getBigInt64(48, true)).toBe(1n)
+      new Uint8Array(memory.buffer, descriptor.getUint32(24, true), 70_000).fill(42)
     })
     const module = await WebAssembly.compile(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]))
     const instantiate = vi.spyOn(WebAssembly, "instantiate").mockResolvedValue({
       exports: {
         memory,
         "main!": main,
-        __sjulia_wasm_abi_version: () => 1,
+        __sjulia_alloc: allocate,
+        __sjulia_free: free,
+        __sjulia_drop: drop,
+        __sjulia_wasm_abi_version: () => 2,
       },
     })
     const input = new Uint8ClampedArray(70_000)
@@ -92,9 +110,12 @@ describe("generated image ABI", () => {
     })
 
     // Then
-    expect(main).toHaveBeenCalledWith(32)
+    expect(allocate).toHaveBeenCalledWith(70_000n, 1)
+    expect(allocate).toHaveBeenCalledWith(56n, 8)
     expect(result.data).toEqual(new Uint8ClampedArray(70_000).fill(42))
     expect(result.data.buffer).not.toBe(memory.buffer)
+    expect(drop).toHaveBeenCalledTimes(1)
+    expect(free).toHaveBeenCalledTimes(1)
     instantiate.mockRestore()
   })
 
@@ -109,7 +130,10 @@ describe("generated image ABI", () => {
           memory.grow(1)
           new Uint8Array(memory.buffer, 64, 4).set([9, 8, 7, 6])
         },
-        __sjulia_wasm_abi_version: () => 1,
+        __sjulia_alloc: (size: bigint) => (size === 4n ? 64 : 72),
+        __sjulia_free: () => undefined,
+        __sjulia_drop: () => undefined,
+        __sjulia_wasm_abi_version: () => 2,
       },
     })
 

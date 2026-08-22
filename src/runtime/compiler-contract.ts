@@ -14,7 +14,7 @@ export type CompilerDiagnostic = {
 export type CompilerSuccess = {
   readonly bytes: Uint8Array
   readonly compilerVersion: string
-  readonly abiVersion: 1
+  readonly abiVersion: 2
 }
 
 const readProperty = (value: unknown, key: string): unknown => {
@@ -71,16 +71,13 @@ export const parseCompilerResult = (value: unknown): CompilerSuccess => {
   if (!(bytes instanceof Uint8Array) || !WebAssembly.validate(bytes)) {
     throw new TypeError("Compiler returned invalid WebAssembly bytes")
   }
-  if (typeof compilerVersion !== "string" || abiVersion !== 1) {
+  if (typeof compilerVersion !== "string" || abiVersion !== 2) {
     throw new TypeError("Compiler returned incompatible metadata")
   }
   return { bytes, compilerVersion, abiVersion }
 }
 
-const DESCRIPTOR_POINTER = 32
-const PIXEL_POINTER = 64
-const DESCRIPTOR_BYTES = 20
-const PAGE_BYTES = 65_536
+const DESCRIPTOR_BYTES = 56
 const MAX_IMAGE_BYTES = 256 * 1024 * 1024
 
 const requireFunction = (exports: WebAssembly.Exports, name: string): CallableFunction => {
@@ -113,23 +110,39 @@ export const executeCompiledImage = async (
   if (!(memory instanceof WebAssembly.Memory)) {
     throw new TypeError("Compiled module is missing memory")
   }
-  const requiredBytes = PIXEL_POINTER + image.data.length
-  if (memory.buffer.byteLength < requiredBytes) {
-    memory.grow(Math.ceil((requiredBytes - memory.buffer.byteLength) / PAGE_BYTES))
-  }
-  const descriptor = new DataView(memory.buffer, DESCRIPTOR_POINTER, DESCRIPTOR_BYTES)
-  descriptor.setUint32(0, 1, true)
-  descriptor.setUint32(4, PIXEL_POINTER, true)
-  descriptor.setUint32(8, image.data.length, true)
-  descriptor.setUint32(12, 1, true)
-  descriptor.setUint32(16, 1, true)
-  new Uint8Array(memory.buffer, PIXEL_POINTER, image.data.length).set(image.data)
   const abiVersion = requireFunction(instance.exports, "__sjulia_wasm_abi_version")()
-  if (abiVersion !== 1) throw new TypeError("Compiled module ABI version must be 1")
-  requireFunction(instance.exports, "main!")(DESCRIPTOR_POINTER)
-  if (memory.buffer.byteLength < requiredBytes) {
-    throw new TypeError("Compiled module changed the image byte length")
+  if (abiVersion !== 2) throw new TypeError("Compiled module ABI version must be 2")
+  const allocate = requireFunction(instance.exports, "__sjulia_alloc")
+  const free = requireFunction(instance.exports, "__sjulia_free")
+  const drop = requireFunction(instance.exports, "__sjulia_drop")
+  const pixelPointer = Number(allocate(BigInt(image.data.length), 1))
+  if (pixelPointer === 0) throw new TypeError("Compiled module could not allocate image bytes")
+  let descriptorPointer = 0
+  try {
+    new Uint8Array(memory.buffer, pixelPointer, image.data.length).set(image.data)
+    descriptorPointer = Number(allocate(BigInt(DESCRIPTOR_BYTES), 8))
+    if (descriptorPointer === 0) throw new TypeError("Compiled module could not allocate image descriptor")
+    const descriptor = new DataView(memory.buffer, descriptorPointer, DESCRIPTOR_BYTES)
+    descriptor.setUint32(0, 2, true)
+    descriptor.setUint32(4, 1, true)
+    descriptor.setUint32(8, 1, true)
+    descriptor.setUint32(12, 1, true)
+    descriptor.setUint32(16, 0, true)
+    descriptor.setUint32(20, 1, true)
+    descriptor.setUint32(24, pixelPointer, true)
+    descriptor.setUint32(28, 0, true)
+    descriptor.setBigUint64(32, BigInt(image.data.length), true)
+    descriptor.setBigUint64(40, BigInt(image.data.length), true)
+    descriptor.setBigInt64(48, 1n, true)
+    requireFunction(instance.exports, "main!")(descriptorPointer)
+    const output = new Uint8Array(memory.buffer, pixelPointer, image.data.length)
+    return { width: image.width, height: image.height, data: new Uint8ClampedArray(output) }
+  } finally {
+    if (descriptorPointer !== 0) {
+      drop(descriptorPointer)
+      free(descriptorPointer)
+    } else {
+      free(pixelPointer)
+    }
   }
-  const output = new Uint8Array(memory.buffer, PIXEL_POINTER, image.data.length)
-  return { width: image.width, height: image.height, data: new Uint8ClampedArray(output) }
 }

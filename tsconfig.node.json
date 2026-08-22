@@ -10,7 +10,7 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "verbatimModuleSyntax": true,
-    "types": ["bun"],
+    "types": ["bun", "vite/client"],
     "noEmit": true,
     "strict": true,
     "noUncheckedIndexedAccess": true,

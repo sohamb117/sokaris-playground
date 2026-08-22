@@ -1,36 +1,5 @@
 import { expect, test } from "@playwright/test"
 
-const SUPPORTED_TRANSFORMS = [
-  "invert",
-  "gamma",
-  "brightness",
-  "contrast",
-  "grayscale",
-  "posterize",
-  "threshold",
-  "solarize",
-  "pixelate",
-] as const
-
-const UNSUPPORTED_IMAGE_OPERATIONS = [
-  "gaussian",
-  "box_blur",
-  "median_blur",
-  "motion_blur",
-  "saturate",
-  "desaturate",
-  "sharpen",
-  "edge_detect",
-  "emboss",
-  "noise",
-  "crop",
-  "crop_center",
-  "crop_to",
-  "scale_crop",
-  "glow",
-  "text_overlay",
-] as const
-
 test("keeps the code editor unobscured when help opens at 1440x900", async ({ page }) => {
   // Given
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -115,7 +84,7 @@ for (const width of [900, 800]) {
   })
 }
 
-test("separates exact supported transforms from unsupported image operations", async ({ page }) => {
+test("separates compiled image rules from scalar compatibility guidance", async ({ page }) => {
   // Given
   await page.goto("/")
 
@@ -124,15 +93,9 @@ test("separates exact supported transforms from unsupported image operations", a
   const dialog = page.getByRole("dialog", { name: "Sokaris compositor help" })
 
   // Then
-  const supported = dialog.getByRole("heading", { name: "Supported transforms" })
-  const unsupported = dialog.getByRole("heading", { name: "Not supported in v0.12.2" })
-  await expect(supported).toBeVisible()
-  await expect(unsupported).toBeVisible()
-  await expect(supported.locator("xpath=following-sibling::p[1]")).toHaveText(
-    SUPPORTED_TRANSFORMS.join(", "),
-  )
-  await expect(unsupported.locator("xpath=following-sibling::p[1]")).toHaveText(
-    UNSUPPORTED_IMAGE_OPERATIONS.join(", "),
-  )
-  await expect(unsupported.locator("xpath=following-sibling::p[1]")).not.toContainText("save")
+  const subset = dialog.getByRole("heading", { name: "Compiler subset" })
+  await expect(subset).toBeVisible()
+  await expect(dialog).toContainText("main!(pixels::Vector{UInt8})")
+  await expect(dialog).toContainText("Source without main! uses the scalar interpreter")
+  await expect(dialog).not.toContainText("posterize")
 })

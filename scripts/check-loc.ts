@@ -9,6 +9,7 @@ const EXCLUDED_PREFIXES = [
   "node_modules/",
   "playwright-report/",
   "src/vendor/subset-julia/",
+  "src/vendor/subset-julia-compiler/",
   "test-results/",
 ] as const
 

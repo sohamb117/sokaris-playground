@@ -10,7 +10,7 @@ test("times out a runaway run and succeeds with the next valid source without re
   const editor = page.getByRole("textbox", { name: "Sokaris code" })
   const scalar = page.locator("[data-scalar-result]")
   const output = page.locator("[data-output-pane]")
-  await expect(scalar).toHaveText("42", { timeout: 30_000 })
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 30_000 })
 
   // When
   await editor.fill("result = ✧(1:400000000, (a,b)->a+b)")
@@ -46,6 +46,21 @@ test("shows an initialization alert and hides loading when the local Wasm reques
 
   // Then
   await expect(page.getByText("loading runtime", { exact: true })).toBeHidden({ timeout: 30_000 })
+  await expect(page.getByRole("alert")).toBeVisible()
+  await expect(page.getByRole("alert")).not.toBeEmpty()
+})
+
+test("shows an initialization alert and hides loading when the worker script fails to load", async ({
+  page,
+}) => {
+  // Given
+  await page.route("**/assets/compiler-worker-*.js", (route) => route.abort("failed"))
+
+  // When
+  await page.goto("/")
+
+  // Then
+  await expect(page.getByText("loading runtime", { exact: true })).toBeHidden({ timeout: 5_000 })
   await expect(page.getByRole("alert")).toBeVisible()
   await expect(page.getByRole("alert")).not.toBeEmpty()
 })

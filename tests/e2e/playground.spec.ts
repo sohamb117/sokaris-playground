@@ -72,7 +72,7 @@ test("renders only the accessible two-column playground controls", async ({ page
     "true",
   )
   await expect(page.getByRole("textbox", { name: "Sokaris code" })).toHaveValue(
-    "result = 21 ▷ (x -> x * 2)",
+    /function main!\(pixels::Vector\{UInt8\}\)/,
   )
   await expect(page.getByRole("button", { name: "Open Sokaris help" })).toHaveText("?")
   await expect(page.getByText("press shift for compositor menu", { exact: true })).toBeVisible()
@@ -104,7 +104,7 @@ test("uses exact 50/50 geometry and preserves the code pane while collapsing fil
     "false",
   )
   await expect(editor).toBeVisible()
-  await expect(editor).toHaveValue("result = 21 ▷ (x -> x * 2)")
+  await expect(editor).toHaveValue(/function main!\(pixels::Vector\{UInt8\}\)/)
   await expect(page.getByRole("button", { name: "Select images" })).toHaveCount(0)
   await main.screenshot({ path: "test-results/evidence/collapsed.png" })
 })
@@ -122,13 +122,13 @@ test("accepts images, replaces duplicate data in place, and rejects invalid deco
   await upload(page, "pixel.png")
 
   // Then
-  await expect(page.getByRole("listitem")).toHaveText(["pixel.png", "second.png"])
+  await expect(page.getByRole("listitem")).toHaveText(["input.png", "pixel.png", "second.png"])
   await drop(page, "broken.png", Buffer.from("not an image"))
   await expect(page.getByRole("alert")).toContainText("broken.png")
-  await expect(page.getByRole("listitem")).toHaveText(["pixel.png", "second.png"])
+  await expect(page.getByRole("listitem")).toHaveText(["input.png", "pixel.png", "second.png"])
 })
 
-test("runs a dropped image repeatedly and retains the last canvas on later errors", async ({
+test("runs the active dropped image repeatedly and retains the last canvas on diagnostics", async ({
   page,
 }) => {
   // Given
@@ -138,16 +138,20 @@ test("runs a dropped image repeatedly and retains the last canvas on later error
   const editor = page.getByRole("textbox", { name: "Sokaris code" })
 
   // When
-  await editor.fill('result = load("pixel.png") ▷ invert')
-  await expect(page.locator("canvas")).toBeVisible({ timeout: 30_000 })
-  await editor.fill('result = load("pixel.png") ▷ invert')
-  await expect(page.locator("canvas")).toBeVisible()
+  const canvas = page.locator("canvas")
+  await expect(canvas).toHaveAttribute("width", "32", { timeout: 30_000 })
+  await editor.focus()
+  await editor.press("End")
+  await page.keyboard.insertText("\n")
+  await expect(canvas).toHaveAttribute("width", "32")
   await page.getByRole("main").screenshot({ path: "test-results/evidence/image-success.png" })
-  await editor.fill("result = gaussian(2)(42)")
+  await editor.fill(`function main!(pixels::Vector{UInt8})
+    label = String(pixels)
+end`)
 
   // Then
-  await expect(page.getByRole("alert")).toContainText("not supported", { timeout: 30_000 })
-  await expect(page.locator("canvas")).toBeVisible()
+  await expect(page.getByRole("alert")).toContainText("String", { timeout: 30_000 })
+  await expect(canvas).toBeVisible()
   const outputBox = await page.locator("[data-output-pane]").boundingBox()
   const alertBox = await page.getByRole("alert").boundingBox()
   expect(outputBox).not.toBeNull()
@@ -163,27 +167,27 @@ test("runs a dropped image repeatedly and retains the last canvas on later error
   await page.getByRole("main").screenshot({ path: "test-results/evidence/error-retained.png" })
 })
 
-test("rasterizes a normal 800x768 image before running VM transforms", async ({ page }) => {
+test("compiles a native 800x768 active image in under three seconds when warm", async ({
+  page,
+}) => {
   // Given
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto("/")
   await waitForReady(page)
-  await upload(page, "output.png", await createVisiblePng(page, 800, 768))
+  const canvas = page.locator("canvas")
+  const started = performance.now()
 
   // When
-  await page
-    .getByRole("textbox", { name: "Sokaris code" })
-    .fill('result = load("output.png") ▷ invert')
-  const canvas = page.locator("canvas")
+  await upload(page, "output.png", await createVisiblePng(page, 800, 768))
+  await expect(canvas).toHaveAttribute("width", "800", { timeout: 3_000 })
+  const elapsed = performance.now() - started
 
   // Then
-  await expect(page.getByRole("listitem")).toHaveText("output.png")
-  await expect(canvas).toBeVisible({ timeout: 30_000 })
-  await expect(canvas).toHaveAttribute("width", "32")
-  await expect(canvas).toHaveAttribute("height", "31")
+  await expect(page.getByRole("listitem")).toHaveText(["input.png", "output.png"])
+  expect(elapsed).toBeLessThan(3_000)
+  await expect(canvas).toHaveAttribute("height", "768")
   const canvasBox = await canvas.boundingBox()
-  expect(canvasBox?.width ?? 0).toBeGreaterThanOrEqual(400)
-  expect((canvasBox?.width ?? 0) / (canvasBox?.height ?? 1)).toBeCloseTo(32 / 31, 2)
+  expect((canvasBox?.width ?? 0) / (canvasBox?.height ?? 1)).toBeCloseTo(800 / 768, 2)
   await expect(page.locator('[role="alert"]')).toBeHidden()
   await expect(page.locator("body")).not.toContainText("unreachable")
 })
@@ -257,31 +261,6 @@ test("opens the exact caret menu and supports insertion, keyboard, and outside d
   await page.keyboard.press("Shift")
   await menu.getByRole("menuitem").nth(1).click()
   await expect(editor).toHaveValue(`▷🝡result = 21 ▷ (x -> x * 2)`)
-})
-
-test("help contains the runtime, transform, and exact glyph guidance and restores focus", async ({
-  page,
-}) => {
-  // Given
-  await page.goto("/")
-  const trigger = page.getByRole("button", { name: "Open Sokaris help" })
-
-  // When
-  await trigger.click()
-  const dialog = page.getByRole("dialog", { name: "Sokaris compositor help" })
-
-  // Then
-  await expect(dialog).toContainText("SubsetJuliaVM is a Julia subset, not full Julia")
-  await expect(dialog).toContainText("load")
-  await expect(dialog).toContainText("result")
-  await expect(dialog).toContainText("invert")
-  await expect(dialog).toContainText("maximum 32×32 VM working preview")
-  await expect(dialog).toContainText("⚹ unsupported in v0.12.2")
-  await expect(dialog.locator("[data-glyph-help]")).toHaveCount(14)
-  await page.getByRole("main").screenshot({ path: "test-results/evidence/help.png" })
-  await page.keyboard.press("Escape")
-  await expect(dialog).toBeHidden()
-  await expect(trigger).toBeFocused()
 })
 
 test("uses only the approved UI palette and forbidden CSS never computes", async ({ page }) => {

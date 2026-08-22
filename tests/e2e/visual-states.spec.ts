@@ -5,7 +5,7 @@ const PNG = Buffer.from(
   "base64",
 )
 
-test("renders a scaled VM canvas with crisp pixels and intrinsic dimensions", async ({ page }) => {
+test("renders a native canvas without pixelated upscaling", async ({ page }) => {
   // Given
   await page.goto("/")
   await expect(page.getByText("loading runtime")).toBeHidden({ timeout: 30_000 })
@@ -15,18 +15,16 @@ test("renders a scaled VM canvas with crisp pixels and intrinsic dimensions", as
     buffer: PNG,
   })
 
-  // When
-  await page.getByRole("textbox", { name: "Sokaris code" }).fill('result = load("pixel.png")')
   const canvas = page.locator("canvas")
 
   // Then
   await expect(canvas).toBeVisible({ timeout: 30_000 })
   await expect(canvas).toHaveAttribute("width", "1")
   await expect(canvas).toHaveAttribute("height", "1")
-  await expect(canvas).toHaveCSS("image-rendering", "pixelated")
+  await expect(canvas).toHaveCSS("image-rendering", "auto")
   const box = await canvas.boundingBox()
-  expect(box?.width ?? 0).toBeGreaterThan(1)
-  expect(box?.height ?? 0).toBeGreaterThan(1)
+  expect(box?.width).toBe(1)
+  expect(box?.height).toBe(1)
 })
 
 test("keeps keyboard focus visually unique when another operator is hovered", async ({ page }) => {
@@ -63,5 +61,5 @@ test("keeps keyboard focus visually unique when another operator is hovered", as
   })
   await page.getByRole("main").screenshot({ path: "test-results/evidence/menu-hover-focus.png" })
   await page.keyboard.press("Enter")
-  await expect(editor).toHaveValue("▷result = 21 ▷ (x -> x * 2)")
+  await expect(editor).toHaveValue(/▷end$/)
 })

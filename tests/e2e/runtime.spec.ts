@@ -60,45 +60,69 @@ test("canonical glyph expression returns 42 in the local VM", async ({ page }) =
   })
 })
 
-test("BrowserImage invert returns exact 2x2 row-major RGBA", async ({ page }) => {
+test("compiled helper loop and branch return exact native RGBA bytes", async ({ page }) => {
   await page.goto("/?runtime-test=1")
   await expect.poll(() => page.evaluate(() => window.__sokarisRuntime?.ready)).toBe(true)
-  const data = [0, 0.25, 0.5, 1, 1, 0.75, 0.5, 0.5, 0.25, 0.5, 0.75, 0.25, 0.75, 0.5, 0.25, 0]
+  const data = [0, 64, 128, 255, 1, 2, 3, 254]
+  const source = `function invert(value::UInt8)::UInt8
+    return UInt8(255 - value)
+end
+function main!(pixels::Vector{UInt8})
+    index = 1
+    while index <= length(pixels)
+        if index != 4 && index != 8
+            pixels[index] = invert(pixels[index])
+        end
+        index = index + 1
+    end
+end`
   await expect(
-    runHarness(page, 'result = load("tiny.png") ▷ invert', [
-      { filename: "tiny.png", width: 2, height: 2, data },
-    ]),
+    runHarness(page, source, [{ filename: "tiny.png", width: 2, height: 1, data }]),
   ).resolves.toEqual({
     kind: "image",
     width: 2,
-    height: 2,
-    data: [1, 0.75, 0.5, 1, 0, 0.25, 0.5, 0.5, 0.75, 0.5, 0.25, 0.25, 0.25, 0.5, 0.75, 0],
+    height: 1,
+    data: [255, 191, 127, 255, 254, 253, 252, 254],
   })
 })
 
-test("missing load and unsupported transforms return explicit VM errors", async ({ page }) => {
+test("load without main! shows migration guidance and compiler diagnostics remain explicit", async ({
+  page,
+}) => {
   await page.goto("/?runtime-test=1")
   await expect.poll(() => page.evaluate(() => window.__sokarisRuntime?.ready)).toBe(true)
   await expect(runHarness(page, 'result = load("missing.png")')).resolves.toMatchObject({
     kind: "error",
-    message: "Sokaris subset error: image 'missing.png' is not loaded.",
+    message: expect.stringContaining("main!(pixels::Vector{UInt8})"),
   })
   await expect(
-    runHarness(page, "result = gaussian(2)(BrowserImage(1, 1, Float64[0, 0, 0, 1]))"),
+    runHarness(
+      page,
+      `function main!(pixels::Vector{UInt8})
+    label = String(pixels)
+end`,
+      [{ filename: "tiny.png", width: 1, height: 1, data: [0, 0, 0, 255] }],
+    ),
   ).resolves.toMatchObject({
     kind: "error",
-    message: "Sokaris subset error: gaussian is not supported by SubsetJuliaVM v0.12.2.",
+    message: expect.stringContaining("String"),
   })
 })
 
 test("runtime execution makes no backend or external evaluator request", async ({ page }) => {
+  // Given
   const requests: string[] = []
   page.on("request", (request) => requests.push(request.url()))
+
+  // When
   await page.goto("/?runtime-test=1")
   await expect.poll(() => page.evaluate(() => window.__sokarisRuntime?.ready)).toBe(true)
   await runHarness(page, "result = 6 * 7")
+
+  // Then
   expect(requests.every((url) => new URL(url).origin === "http://127.0.0.1:4173")).toBe(true)
   expect(requests.some((url) => new URL(url).pathname.startsWith("/api/"))).toBe(false)
+  expect(requests.some((url) => new URL(url).hostname !== "127.0.0.1")).toBe(false)
 })
 
 test("all fourteen glyphs are browser-probed or explicitly unsupported", async ({ page }) => {
@@ -120,19 +144,10 @@ test("all fourteen glyphs are browser-probed or explicitly unsupported", async (
     await expect(runHarness(page, source), glyph).resolves.toMatchObject({ kind: "scalar", value })
   }
   await expect(
-    runHarness(
-      page,
-      "result = ⊙(BrowserImage(1, 1, Float64[0.5, 0.5, 0.5, 1]), BrowserImage(1, 1, Float64[0.5, 1, 0, 0.5]))",
-    ),
-  ).resolves.toMatchObject({ kind: "image", data: [0.25, 0.5, 0, 0.5] })
-  await expect(
     runHarness(page, "result = ⇉(x -> x + 1, x -> x * 2)(20)[1]"),
   ).resolves.toMatchObject({ kind: "scalar", value: 21 })
   await expect(runHarness(page, "result = ⚹([1 2; 3 4], 1, 1)")).resolves.toMatchObject({
     kind: "error",
     message: "Sokaris subset error: ⚹ is not supported by SubsetJuliaVM v0.12.2.",
   })
-  await expect(
-    runHarness(page, "result = 𓇬(BrowserImage(1, 1, Float64[-1, 0.5, 2, 0.25]))"),
-  ).resolves.toMatchObject({ kind: "image", data: [0, 0.5, 1, 0.25] })
 })

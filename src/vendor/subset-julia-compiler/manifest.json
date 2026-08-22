@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "sourceProject": "subset_julia_vm",
+  "package": "subset_julia_vm_web",
+  "version": "0.11.1",
+  "compilerAbiVersion": 3,
+  "generatedMemoryAbiVersion": 1,
+  "files": [
+    {
+      "path": "subset_julia_vm_web.js",
+      "sha256": "47b5866d0c42b7159d89cdd5ced7bb47e59770ae3ffb20ffa8ff3699a35d99f9"
+    },
+    {
+      "path": "subset_julia_vm_web_bg.wasm",
+      "sha256": "f45d562e4bffd0f43441beaf341f54693b5e37c8bcd7670c25a4bc5ce5eaee43",
+      "size": 25540486
+    },
+    {
+      "path": "subset_julia_vm_web.d.ts",
+      "sha256": "5ea6ac659237dfba8c7ac60035839ba93b2afae3fa31977f0bffb4caacde0c33"
+    },
+    {
+      "path": "subset_julia_vm_web_bg.wasm.d.ts",
+      "sha256": "60990c116ac6234c2dd0fd0e8c9dea53b1280cf0a2846e22d315a68fc7466c0f"
+    },
+    {
+      "path": "package.json",
+      "sha256": "284f1427757c1d6fbcf45625a521e1364d205f7029a17ce7879581a25fcc504b"
+    }
+  ]
+}

@@ -59,7 +59,7 @@ There is no backend or network evaluator.
 
 The compiler package under `src/vendor/subset-julia-compiler/` is pinned by a
 separate manifest that records source-project identity, compiler package ABI 3, generated
-memory ABI 1, all artifact SHA-256 digests, and the exact `25,535,749`-byte Wasm
+memory ABI 2, all artifact SHA-256 digests, and the exact `26,810,214`-byte Wasm
 size. The immutable scalar interpreter package from `terasakisatoshi/subset_julia` commit
 `561587e7a6f3914a24afd883a0dba52d51f3453d` is bundled under
 `src/vendor/subset-julia/`. `bun run vendor` verifies all five SHA-256 digests and
@@ -67,7 +67,7 @@ the exact `26,217,180`-byte Wasm size.
 
 Browser images are decoded locally at native dimensions into row-major
 `Uint8ClampedArray` RGBA bytes. The compiler worker validates generated Wasm,
-caches up to 32 modules by source and ABI, writes ABI v1 descriptors, executes
+caches up to 32 modules by source and ABI, writes ABI v2 descriptors, executes
 the exact `main!` export, copies output bytes, and paints them without a JavaScript
 pixel transform. Source without `main!` uses the interpreter only for scalar
 compatibility; source containing `load(` receives migration guidance instead of
@@ -99,3 +99,14 @@ bun run loc
 plus Shift, starter, help, and core compatibility coverage in Firefox. Runtime
 requests remain same-origin static assets; there is no backend or external
 evaluator.
+
+## GitHub Pages
+
+The workflow in `.github/workflows/deploy-pages.yml` verifies and builds the app,
+then publishes `dist/` whenever `main` is pushed. The production build uses
+relative asset URLs, so it works for either a repository Pages URL such as
+`https://<owner>.github.io/<repository>/` or a custom domain.
+
+After pushing this repository to GitHub, open **Settings → Pages** and choose
+**GitHub Actions** as the source. No deployment secrets are required. The
+workflow also supports manual runs from the Actions tab.

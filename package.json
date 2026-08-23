@@ -21,11 +21,9 @@
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.8.0",
     "@types/bun": "^1.2.20",
-    "binaryen": "132.0.0",
     "jsdom": "^26.1.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.2",
-    "vitest": "^4.1.6",
-    "wrangler": "4.125.0"
+    "vitest": "^4.1.6"
   }
 }

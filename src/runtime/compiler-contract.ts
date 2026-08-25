@@ -15,6 +15,16 @@ export type CompilerSuccess = {
   readonly bytes: Uint8Array
   readonly compilerVersion: string
   readonly abiVersion: 2
+  readonly entryPoint: string | undefined
+  readonly imports: readonly CompilerImport[]
+}
+
+export type CompilerImport = {
+  readonly module: string
+  readonly name: string
+  readonly functionName: string
+  readonly params: readonly string[]
+  readonly result?: string
 }
 
 const readProperty = (value: unknown, key: string): unknown => {
@@ -51,6 +61,34 @@ const readDiagnostics = (value: unknown): readonly CompilerDiagnostic[] => {
   return diagnostics.map(readDiagnostic)
 }
 
+const readImport = (value: unknown): CompilerImport => {
+  const module = readProperty(value, "module")
+  const name = readProperty(value, "name")
+  const functionName = readProperty(value, "function_name")
+  const params = readProperty(value, "params")
+  const result = readProperty(value, "result")
+  if (
+    typeof module !== "string" ||
+    typeof name !== "string" ||
+    typeof functionName !== "string" ||
+    !Array.isArray(params) ||
+    !params.every((param) => typeof param === "string") ||
+    (result !== undefined && typeof result !== "string")
+  ) {
+    throw new TypeError("Compiler returned invalid import metadata")
+  }
+  return result === undefined
+    ? { module, name, functionName, params }
+    : { module, name, functionName, params, result }
+}
+
+const readImports = (value: unknown): readonly CompilerImport[] => {
+  const imports = readProperty(value, "imports")
+  if (imports === undefined) return []
+  if (!Array.isArray(imports)) throw new TypeError("Compiler returned invalid import metadata")
+  return imports.map(readImport)
+}
+
 export const formatCompilerDiagnostics = (value: unknown): string =>
   readDiagnostics(value)
     .map((diagnostic) => {
@@ -66,15 +104,21 @@ export const parseCompilerResult = (value: unknown): CompilerSuccess => {
   const bytes = readProperty(value, "wasm_bytes")
   const compilerVersion = readProperty(value, "compiler_version")
   const abiVersion = readProperty(value, "abi_version")
+  const entryPoint = readProperty(value, "entry_point")
+  const imports = readImports(value)
   readDiagnostics(value)
   if (success !== true) throw new TypeError(formatCompilerDiagnostics(value))
   if (!(bytes instanceof Uint8Array) || !WebAssembly.validate(bytes)) {
     throw new TypeError("Compiler returned invalid WebAssembly bytes")
   }
-  if (typeof compilerVersion !== "string" || abiVersion !== 2) {
+  if (
+    typeof compilerVersion !== "string" ||
+    abiVersion !== 2 ||
+    (entryPoint !== undefined && typeof entryPoint !== "string")
+  ) {
     throw new TypeError("Compiler returned incompatible metadata")
   }
-  return { bytes, compilerVersion, abiVersion }
+  return { bytes, compilerVersion, abiVersion, entryPoint, imports }
 }
 
 const DESCRIPTOR_BYTES = 56

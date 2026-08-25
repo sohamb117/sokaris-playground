@@ -21,7 +21,63 @@ describe("compiler result contract", () => {
     })
 
     // Then
-    expect(result).toEqual({ bytes, compilerVersion: "0.11.1", abiVersion: 2 })
+    expect(result).toEqual({
+      bytes,
+      compilerVersion: "0.11.1",
+      abiVersion: 2,
+      entryPoint: undefined,
+      imports: [],
+    })
+  })
+
+  it("parses script entry and typed host import metadata", () => {
+    // Given
+    const bytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0])
+
+    // When
+    const result = parseCompilerResult({
+      success: true,
+      wasm_bytes: bytes,
+      diagnostics: [],
+      compiler_version: "0.11.1",
+      abi_version: 2,
+      entry_point: "__sjulia_script_entry",
+      imports: [
+        {
+          module: "sjulia_host",
+          name: "load",
+          function_name: "__sjulia_host_load",
+          params: ["String", "Int64", "Int64"],
+          result: "Int64",
+        },
+      ],
+    })
+
+    // Then
+    expect(result.entryPoint).toBe("__sjulia_script_entry")
+    expect(result.imports).toEqual([
+      {
+        module: "sjulia_host",
+        name: "load",
+        functionName: "__sjulia_host_load",
+        params: ["String", "Int64", "Int64"],
+        result: "Int64",
+      },
+    ])
+  })
+
+  it("rejects malformed host import metadata", () => {
+    const parse = () =>
+      parseCompilerResult({
+        success: true,
+        wasm_bytes: new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]),
+        diagnostics: [],
+        compiler_version: "0.11.1",
+        abi_version: 2,
+        imports: [{ module: "sjulia_host", name: "load", params: [42] }],
+      })
+
+    expect(parse).toThrow("Compiler returned invalid import metadata")
   })
 
   it("rejects invalid success bytes", () => {

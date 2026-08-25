@@ -25,6 +25,16 @@ const toSerializableResult = async (
         height: result.height,
         data: Array.from(result.data),
       }
+    case "artifacts":
+      return {
+        kind: "artifacts",
+        artifacts: result.artifacts.map((artifact) => ({
+          filename: artifact.filename,
+          width: artifact.width,
+          height: artifact.height,
+          data: Array.from(artifact.data),
+        })),
+      }
     case "error":
       return result
     case "stale":

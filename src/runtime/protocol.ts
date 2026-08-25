@@ -1,4 +1,4 @@
-import type { RuntimeRequest, RuntimeResult } from "./types.ts"
+import type { RuntimeArtifact, RuntimeRequest, RuntimeResult } from "./types.ts"
 
 export type WorkerRunRequest = {
   readonly kind: "run"
@@ -35,6 +35,28 @@ const readProperty = (value: unknown, key: string): unknown => {
   return Reflect.get(value, key)
 }
 
+const parseArtifact = (value: unknown): RuntimeArtifact => {
+  const filename = readProperty(value, "filename")
+  const width = readProperty(value, "width")
+  const height = readProperty(value, "height")
+  const data = readProperty(value, "data")
+  if (
+    typeof filename !== "string" ||
+    filename.length === 0 ||
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width < 1 ||
+    height < 1 ||
+    !(data instanceof Uint8ClampedArray) ||
+    data.length !== width * height * 4
+  ) {
+    throw new TypeError("Invalid runtime artifact")
+  }
+  return { filename, width, height, data }
+}
+
 const parseRuntimeResult = (value: unknown): RuntimeResult => {
   const kind = readProperty(value, "kind")
   if (kind === "stale") return { kind }
@@ -64,7 +86,17 @@ const parseRuntimeResult = (value: unknown): RuntimeResult => {
       return { kind, width, height, data }
     }
   }
+  if (kind === "artifacts") {
+    const artifacts = readProperty(value, "artifacts")
+    if (Array.isArray(artifacts)) return { kind, artifacts: artifacts.map(parseArtifact) }
+  }
   throw new TypeError("Invalid runtime result")
+}
+
+export const runtimeResultTransfers = (result: RuntimeResult): Transferable[] => {
+  if (result.kind === "image") return [result.data.buffer]
+  if (result.kind === "artifacts") return result.artifacts.map(({ data }) => data.buffer)
+  return []
 }
 
 export const parseWorkerResponse = (value: unknown): WorkerResponse => {

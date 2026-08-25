@@ -76,6 +76,21 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
       dom.scalar.hidden = true
       return
     }
+    if (result.kind === "artifacts") {
+      const artifact = result.artifacts.at(-1)
+      if (artifact !== undefined) {
+        try {
+          paintImage(dom.canvas, artifact)
+        } catch (error) {
+          if (error instanceof Error) showError(error.message)
+          else throw error
+          return
+        }
+        dom.canvas.hidden = false
+      }
+      dom.scalar.hidden = true
+      return
+    }
     dom.scalar.textContent = String(result.value)
     dom.scalar.hidden = false
   }

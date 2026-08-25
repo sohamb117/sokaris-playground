@@ -9,6 +9,15 @@ type HarnessResult =
       readonly data: number[]
     }
   | { readonly kind: "error"; readonly message: string; readonly output: string }
+  | {
+      readonly kind: "artifacts"
+      readonly artifacts: readonly {
+        readonly filename: string
+        readonly width: number
+        readonly height: number
+        readonly data: readonly number[]
+      }[]
+    }
 
 const runHarness = async (
   page: import("@playwright/test").Page,

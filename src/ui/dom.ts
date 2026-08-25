@@ -14,6 +14,7 @@ export type PlaygroundDom = {
   readonly dropZone: HTMLLabelElement
   readonly fileInput: HTMLInputElement
   readonly fileList: HTMLUListElement
+  readonly outputList: HTMLUListElement
   readonly textarea: HTMLTextAreaElement
   readonly helpTrigger: HTMLButtonElement
   readonly loading: HTMLElement
@@ -33,17 +34,21 @@ export const createPlaygroundDom = (): PlaygroundDom => {
   imageToggle.type = "button"
   imageToggle.textContent = "Images"
   imageToggle.setAttribute("aria-expanded", "true")
+  const imagePaneContent = element("div", "image-pane-content")
   const dropZone = element("label", "image-drop-zone")
-  dropZone.textContent = "drop images or select files"
+  dropZone.append("drop images or select files")
   const fileInput = element("input", "file-input")
   fileInput.type = "file"
   fileInput.accept = "image/*"
   fileInput.multiple = true
   fileInput.setAttribute("aria-label", "Select images")
   const fileList = element("ul", "file-list")
-  fileList.setAttribute("aria-label", "Loaded images")
-  dropZone.append(fileInput, fileList)
-  imagePane.append(imageToggle, dropZone)
+  fileList.setAttribute("aria-label", "Input images")
+  const outputList = element("ul", "file-list")
+  outputList.setAttribute("aria-label", "Saved outputs")
+  dropZone.append(fileInput)
+  imagePaneContent.append(dropZone, fileList, outputList)
+  imagePane.append(imageToggle, imagePaneContent)
 
   const codePane = element("section", "code-pane")
   const textarea = element("textarea", "code-editor")
@@ -86,6 +91,7 @@ export const createPlaygroundDom = (): PlaygroundDom => {
     dropZone,
     fileInput,
     fileList,
+    outputList,
     textarea,
     helpTrigger,
     loading,

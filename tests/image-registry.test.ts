@@ -35,4 +35,52 @@ describe("image registry", () => {
     expect(registry.active()).toEqual(image("first.png", 255))
     expect(registry.list().map(({ filename }) => filename)).toEqual(["first.png", "second.png"])
   })
+
+  it("atomically replaces outputs and selects the last saved artifact", () => {
+    // Given
+    const registry = new ImageRegistry()
+    registry.replace([image("input.png", 0)])
+    registry.replaceOutputs([image("old.png", 64)])
+
+    // When
+    registry.replaceOutputs([image("results/first.png", 128), image("results/last.png", 255)])
+
+    // Then
+    expect(registry.outputs().map(({ filename }) => filename)).toEqual([
+      "results/first.png",
+      "results/last.png",
+    ])
+    expect(registry.selected()).toEqual({
+      provenance: "output",
+      image: image("results/last.png", 255),
+    })
+  })
+
+  it("selects an input without changing runtime input order", () => {
+    // Given
+    const registry = new ImageRegistry()
+    registry.replace([image("first.png", 0), image("second.png", 64)])
+
+    // When
+    const selected = registry.select("input", "first.png")
+
+    // Then
+    expect(selected).toEqual(image("first.png", 0))
+    expect(registry.selected()).toEqual({ provenance: "input", image: image("first.png", 0) })
+    expect(registry.list().map(({ filename }) => filename)).toEqual(["first.png", "second.png"])
+  })
+
+  it("retains outputs and selection when no replacement is committed", () => {
+    // Given
+    const registry = new ImageRegistry()
+    registry.replace([image("input.png", 0)])
+    registry.replaceOutputs([image("output.png", 255)])
+
+    // When
+    const retained = registry.selected()
+
+    // Then
+    expect(registry.outputs()).toEqual([image("output.png", 255)])
+    expect(retained).toEqual({ provenance: "output", image: image("output.png", 255) })
+  })
 })

@@ -128,18 +128,26 @@ All spacing derives from a 4px base unit.
   the image folder, exposes `aria-expanded`, and uses the label type token with
   `12px` horizontal inset. Hover and focus invert black and white immediately;
   focus also receives the `2px` strong rule inset from the pane edge.
-- `ImageDropZone`: the remaining `108px` of the expanded row is a native file
-  selection target and drop target for multiple `image/*` files. Its inset is
-  `12px`; instructional copy uses the caption token. It lists accepted files by
-  exact filename in insertion order and contains no remove, rename, or action
-  control. The initial registry contains the bundled project-owned `input.png`,
+- `ImageDropZone`: the remaining `108px` of the expanded row contains a native
+  file selection/drop target followed by compact input and saved-output lists.
+  Its inset is `12px`; instructional copy uses the caption token. The initial
+  registry contains the bundled project-owned `input.png`,
   decoded through `ImageDecodeBoundary`; a later valid duplicate replaces data
   without moving the name.
+- `ImageArtifactRow`: each input and saved output is a native full-width button
+  in insertion/save order. The visible label is the path basename while the
+  accessible name includes `Input` or `Output` and the exact virtual path.
+  Clicking or keyboard-activating a row selects it and paints its native RGBA
+  bytes on `ResultCanvas`. The selected row exposes `aria-pressed=true` and
+  inverts to white with black text; hover underlines without creating a second
+  selected-looking row. Saved outputs replace the previous successful output
+  list atomically only after a successful run. Compile/runtime/decode failures
+  retain the prior output list, selected artifact, and canvas.
 - `ImageDecodeBoundary`: each accepted image is decoded at native dimensions
   with no rescale into row-major `Uint8ClampedArray` RGBA bytes. Browser decode
   disables color-space conversion, alpha premultiplication, and orientation.
-  The most recently inserted or replaced registry image is active; list order
-  remains unchanged and only the active image reaches the compiler.
+  The most recently inserted or replaced registry image is selected; list order
+  remains unchanged and every registered image reaches script execution.
 - States: expanded-empty, expanded-populated, collapsed, drag-target, and
   decode-error. Drag-target uses immediate color inversion only. Decode errors
   are rendered by the shared output alert and do not mutate this pane.

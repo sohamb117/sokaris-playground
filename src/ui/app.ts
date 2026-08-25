@@ -1,7 +1,9 @@
 import { loadStarterImage } from "../examples/load-starter-image.ts"
+import type { RuntimeImage } from "../runtime/types.ts"
+import { type ArtifactProvenance, renderArtifactList } from "./artifact-list.ts"
 import { paintImage } from "./canvas-painter.ts"
 import { Debouncer } from "./debouncer.ts"
-import { createPlaygroundDom, type PlaygroundDom } from "./dom.ts"
+import { createPlaygroundDom } from "./dom.ts"
 import { HelpDialog } from "./help-dialog.ts"
 import { decodeImages, ImageDecodeError } from "./image-decoder.ts"
 import { ImageRegistry } from "./image-registry.ts"
@@ -9,15 +11,6 @@ import { OperatorMenu } from "./operator-menu.ts"
 import { createRuntimeClient } from "./runtime-client.ts"
 
 export type SokarisApp = { readonly dispose: () => void }
-
-const renderFiles = (dom: PlaygroundDom, registry: ImageRegistry): void => {
-  dom.fileList.replaceChildren()
-  for (const image of registry.list()) {
-    const item = document.createElement("li")
-    item.textContent = image.filename
-    dom.fileList.append(item)
-  }
-}
 
 export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
   const dom = createPlaygroundDom()
@@ -29,6 +22,43 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
   let ready = false
   let disposed = false
   let latestRun = 0
+
+  const preview = (image: RuntimeImage): boolean => {
+    try {
+      paintImage(dom.canvas, image)
+    } catch (error) {
+      if (error instanceof Error) showError(error.message)
+      else throw error
+      return false
+    }
+    dom.canvas.hidden = false
+    dom.scalar.hidden = true
+    return true
+  }
+
+  const selectArtifact = (provenance: ArtifactProvenance, path: string): void => {
+    const images = provenance === "input" ? registry.list() : registry.outputs()
+    const image = images.find(({ filename }) => filename === path)
+    if (image === undefined || !preview(image)) return
+    registry.select(provenance, path)
+    renderFiles()
+  }
+
+  const renderFiles = (): void => {
+    const selected = registry.selected()
+    renderArtifactList(dom.fileList, {
+      provenance: "input",
+      images: registry.list(),
+      selectedPath: selected?.provenance === "input" ? selected.image.filename : undefined,
+      onSelect: (path) => selectArtifact("input", path),
+    })
+    renderArtifactList(dom.outputList, {
+      provenance: "output",
+      images: registry.outputs(),
+      selectedPath: selected?.provenance === "output" ? selected.image.filename : undefined,
+      onSelect: (path) => selectArtifact("output", path),
+    })
+  }
 
   const showError = (message: string): void => {
     dom.alert.textContent = message
@@ -65,29 +95,14 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
     }
     dom.alert.hidden = true
     if (result.kind === "image") {
-      try {
-        paintImage(dom.canvas, result)
-      } catch (error) {
-        if (error instanceof Error) showError(error.message)
-        else throw error
-        return
-      }
-      dom.canvas.hidden = false
-      dom.scalar.hidden = true
+      preview(result)
       return
     }
     if (result.kind === "artifacts") {
       const artifact = result.artifacts.at(-1)
-      if (artifact !== undefined) {
-        try {
-          paintImage(dom.canvas, artifact)
-        } catch (error) {
-          if (error instanceof Error) showError(error.message)
-          else throw error
-          return
-        }
-        dom.canvas.hidden = false
-      }
+      if (artifact !== undefined && !preview(artifact)) return
+      registry.replaceOutputs(result.artifacts)
+      renderFiles()
       dom.scalar.hidden = true
       return
     }
@@ -100,7 +115,7 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
     try {
       const decoded = await decodeImages(files)
       registry.replace(decoded)
-      renderFiles(dom, registry)
+      renderFiles()
       schedule()
     } catch (error) {
       if (error instanceof ImageDecodeError) showError(error.message)
@@ -145,7 +160,7 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
     ([, image]) => {
       if (disposed) return
       registry.replace([image])
-      renderFiles(dom, registry)
+      renderFiles()
       ready = true
       dom.loading.hidden = true
       void execute()

@@ -122,10 +122,12 @@ test("accepts images, replaces duplicate data in place, and rejects invalid deco
   await upload(page, "pixel.png")
 
   // Then
-  await expect(page.getByRole("listitem")).toHaveText(["input.png", "pixel.png", "second.png"])
+  await expect(page.getByRole("button", { name: "Input inputs/input.png" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Input pixel.png" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Input second.png" })).toBeVisible()
   await drop(page, "broken.png", Buffer.from("not an image"))
   await expect(page.getByRole("alert")).toContainText("broken.png")
-  await expect(page.getByRole("listitem")).toHaveText(["input.png", "pixel.png", "second.png"])
+  await expect(page.getByRole("button", { name: /^Input / })).toHaveCount(3)
 })
 
 test("runs the active dropped image repeatedly and retains the last canvas on diagnostics", async ({
@@ -183,7 +185,8 @@ test("compiles a native 800x768 active image in under three seconds when warm", 
   const elapsed = performance.now() - started
 
   // Then
-  await expect(page.getByRole("listitem")).toHaveText(["input.png", "output.png"])
+  await expect(page.getByRole("button", { name: "Input inputs/input.png" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Input output.png" })).toBeVisible()
   expect(elapsed).toBeLessThan(3_000)
   await expect(canvas).toHaveAttribute("height", "768")
   const canvasBox = await canvas.boundingBox()

@@ -115,15 +115,18 @@ button:focus-visible,
   outline-offset: -2px;
 }
 
-.image-drop-zone {
+.image-pane-content {
   position: relative;
-  display: block;
   height: 108px;
   padding: var(--space-3);
   overflow: auto;
-  cursor: pointer;
   font-size: 12px;
   line-height: 1.25;
+}
+
+.image-drop-zone {
+  display: block;
+  cursor: pointer;
 }
 
 .file-input {
@@ -139,6 +142,41 @@ button:focus-visible,
   margin: var(--space-2) 0 0;
   padding: 0;
   list-style: none;
+}
+
+.file-list + .file-list {
+  margin-top: var(--space-1);
+}
+
+.artifact-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  color: var(--color-white);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifact-button[aria-pressed="true"],
+.artifact-button:focus-visible {
+  color: var(--color-black);
+  background: var(--color-white);
+}
+
+.artifact-button:hover {
+  text-decoration: underline;
+}
+
+.artifact-button:hover:not([aria-pressed="true"]):not(:focus-visible) {
+  color: var(--color-white);
+  background: var(--color-black);
+}
+
+.artifact-button:focus-visible {
+  outline: 2px solid var(--color-black);
+  outline-offset: -2px;
 }
 
 .code-pane {

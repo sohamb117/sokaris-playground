@@ -41,6 +41,44 @@ beforeAll(async () => {
 })
 
 describe("vendored general compiler", () => {
+  it("compiles top-level scripts with typed image imports", async () => {
+    const raw = compile_to_wasm(
+      `load(path::String)::Array{UInt8,3} = Array{UInt8,3}(undef, 0, 0, 0)
+image = load("inputs/input.png")`,
+      {
+        source_name: "script.jl",
+        opt_level: 2,
+        entry_mode: "script",
+        imports: [
+          {
+            module: "sjulia_host",
+            name: "load",
+            function_name: "load",
+            params: ["String"],
+            result: "Array{UInt8,3}",
+          },
+        ],
+      },
+    )
+
+    const compiled = parseCompilerResult(raw)
+    const module = await WebAssembly.compile(compiled.bytes)
+
+    expect(compiled.entryPoint).toBe("__sjulia_script_entry")
+    expect(compiled.imports).toEqual([
+      {
+        module: "sjulia_host",
+        name: "load",
+        functionName: "load",
+        params: ["String"],
+        result: "Array{UInt8, 3}",
+      },
+    ])
+    expect(WebAssembly.Module.imports(module)).toEqual([
+      { module: "sjulia_host", name: "load", kind: "function" },
+    ])
+  })
+
   it("compiles and runs the exact helper, loop, and branch starter", async () => {
     // Given
     const compiled = parseCompilerResult(compile(STARTER_SOURCE))

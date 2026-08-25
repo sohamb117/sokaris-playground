@@ -1,6 +1,5 @@
 import type { BrowserImageSource } from "./types.ts"
 import type { BrowserImageFileSystem, BrowserImageRun } from "./virtual-filesystem.ts"
-import { VirtualFileNotFoundError, VirtualPathError } from "./virtual-filesystem.ts"
 
 const ABI_VERSION = 2
 const HEADER_BYTES = 40
@@ -158,40 +157,26 @@ const writeImageDescriptor = (
 
 export const createBrowserHostImports = (options: BrowserHostOptions) => ({
   sjulia_host: {
-    load: (pathView: number, _layout: bigint, output: bigint): bigint => {
-      try {
-        writeImageDescriptor(
-          options.memory,
-          options.allocate,
-          checkedNumber(output, "Output pointer"),
-          options.filesystem.load(readPath(options.memory, pathView)),
-        )
-        return 0n
-      } catch (error) {
-        if (error instanceof VirtualFileNotFoundError) return 2n
-        if (error instanceof VirtualPathError || error instanceof TypeError) return 1n
-        if (error instanceof RangeError) return 6n
-        return 5n
-      }
+    load: (pathView: number): number => {
+      const output = options.allocate(BigInt(HEADER_BYTES + IMAGE_RANK * AXIS_BYTES), 8)
+      if (output === 0) throw new RangeError("Could not allocate image descriptor")
+      writeImageDescriptor(
+        options.memory,
+        options.allocate,
+        output,
+        options.filesystem.load(readPath(options.memory, pathView)),
+      )
+      return output
     },
-    save: (pathView: number, descriptor: bigint): bigint => {
-      try {
-        const path = readPath(options.memory, pathView)
-        const image = readImageDescriptor(
-          options.memory,
-          checkedNumber(descriptor, "Image descriptor pointer"),
-        )
-        options.run.save(path, {
-          filename: path,
-          width: checkedNumber(image.dimensions[1] ?? 0n, "Image width"),
-          height: checkedNumber(image.dimensions[2] ?? 0n, "Image height"),
-          data: image.data,
-        })
-        return 0n
-      } catch (error) {
-        if (error instanceof VirtualPathError || error instanceof TypeError) return 1n
-        return 5n
-      }
+    save: (pathView: number, descriptor: number): void => {
+      const path = readPath(options.memory, pathView)
+      const image = readImageDescriptor(options.memory, descriptor)
+      options.run.save(path, {
+        filename: path,
+        width: checkedNumber(image.dimensions[1] ?? 0n, "Image width"),
+        height: checkedNumber(image.dimensions[2] ?? 0n, "Image height"),
+        data: image.data,
+      })
     },
   },
 })

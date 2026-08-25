@@ -16,16 +16,15 @@ const metadata = (bytes: Uint8Array): CompilerSuccess => ({
     {
       module: "sjulia_host",
       name: "load",
-      functionName: "__sjulia_host_load",
-      params: ["String", "Int64", "Int64"],
-      result: "Int64",
+      functionName: "load",
+      params: ["String"],
+      result: "Array{UInt8, 3}",
     },
     {
       module: "sjulia_host",
       name: "save",
-      functionName: "__sjulia_host_save",
-      params: ["String", "Int64"],
-      result: "Int64",
+      functionName: "save",
+      params: ["String", "Array{UInt8, 3}"],
     },
   ],
 })

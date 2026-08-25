@@ -9,6 +9,8 @@ import {
   formatCompilerDiagnostics,
   parseCompilerResult,
 } from "../src/runtime/compiler-contract.ts"
+import { executeCompiledScript } from "../src/runtime/script-executor.ts"
+import { BrowserImageFileSystem } from "../src/runtime/virtual-filesystem.ts"
 import initCompiler, {
   compile_to_wasm,
 } from "../src/vendor/subset-julia-compiler/subset_julia_vm_web.js"
@@ -76,6 +78,59 @@ image = load("inputs/input.png")`,
     ])
     expect(WebAssembly.Module.imports(module)).toEqual([
       { module: "sjulia_host", name: "load", kind: "function" },
+    ])
+  })
+
+  it("executes browser-backed load and save as a transaction", async () => {
+    const raw = compile_to_wasm(
+      `load(path::String)::Array{UInt8,3} = Array{UInt8,3}(undef, 0, 0, 0)
+function save(path::String, image::Array{UInt8,3})::Nothing
+    return
+end
+image = load("inputs/input.png")
+save("outputs/result.png", image)`,
+      {
+        source_name: "load-save.jl",
+        opt_level: 2,
+        entry_mode: "script",
+        imports: [
+          {
+            module: "sjulia_host",
+            name: "load",
+            function_name: "load",
+            params: ["String"],
+            result: "Array{UInt8,3}",
+          },
+          {
+            module: "sjulia_host",
+            name: "save",
+            function_name: "save",
+            params: ["String", "Array{UInt8,3}"],
+          },
+        ],
+      },
+    )
+    const compiled = parseCompilerResult(raw)
+    const module = await WebAssembly.compile(compiled.bytes)
+    const filesystem = new BrowserImageFileSystem()
+    filesystem.replaceInputs([
+      {
+        filename: "inputs/input.png",
+        width: 1,
+        height: 1,
+        data: new Uint8ClampedArray([10, 20, 30, 40]),
+      },
+    ])
+
+    const outputs = await executeCompiledScript(module, compiled, filesystem)
+
+    expect(outputs).toEqual([
+      {
+        filename: "outputs/result.png",
+        width: 1,
+        height: 1,
+        data: new Uint8ClampedArray([10, 20, 30, 40]),
+      },
     ])
   })
 

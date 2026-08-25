@@ -51,9 +51,7 @@ describe("browser Sokaris host imports", () => {
     const run = filesystem.beginRun()
     const imports = createBrowserHostImports({ memory, allocate, filesystem, run })
     const path = writeStringView(memory, allocate, "inputs/input.png")
-    const output = allocate(88n, 8)
-
-    expect(imports.sjulia_host.load(path, 0n, BigInt(output))).toBe(0n)
+    const output = imports.sjulia_host.load(path)
 
     const descriptor = readImageDescriptor(memory, output)
     expect(descriptor.flags).toBe(1)
@@ -69,7 +67,7 @@ describe("browser Sokaris host imports", () => {
     const imports = createBrowserHostImports({ memory, allocate, filesystem, run })
     const path = writeStringView(memory, allocate, "missing.png")
 
-    expect(imports.sjulia_host.load(path, 0n, BigInt(allocate(88n, 8)))).toBe(2n)
+    expect(() => imports.sjulia_host.load(path)).toThrow("Virtual image not found: missing.png")
     expect(filesystem.outputs()).toEqual([])
   })
 
@@ -99,7 +97,7 @@ describe("browser Sokaris host imports", () => {
     view.setBigUint64(output + 72, 1n, true)
     view.setBigInt64(output + 80, 8n, true)
 
-    expect(imports.sjulia_host.save(path, BigInt(output))).toBe(0n)
+    expect(imports.sjulia_host.save(path, output)).toBeUndefined()
     expect(filesystem.outputs()).toEqual([])
 
     run.commit()

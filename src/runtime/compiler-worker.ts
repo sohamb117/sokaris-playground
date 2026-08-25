@@ -3,6 +3,7 @@ import initCompiler, {
   compile_to_wasm,
 } from "../vendor/subset-julia-compiler/subset_julia_vm_web.js"
 import compilerWasmUrl from "../vendor/subset-julia-compiler/subset_julia_vm_web_bg.wasm?url"
+import { COMPILED_SCRIPT_IMPORTS, composeCompiledScriptSource } from "./compiled-script-source.ts"
 import { CompilerModuleCache } from "./compiler-cache.ts"
 import {
   executeCompiledImage,
@@ -10,12 +11,22 @@ import {
   parseCompilerResult,
 } from "./compiler-contract.ts"
 import { composeRuntimeSource } from "./julia-source.ts"
-import type { WorkerResponse, WorkerRunRequest } from "./protocol.ts"
+import { runtimeResultTransfers, type WorkerResponse, type WorkerRunRequest } from "./protocol.ts"
 import { parseExecutionResult } from "./result-parser.ts"
+import { executeCompiledScript } from "./script-executor.ts"
 import { routeSource } from "./source-route.ts"
 import type { BrowserImageSource, RuntimeResult } from "./types.ts"
+import { BrowserImageFileSystem } from "./virtual-filesystem.ts"
 
 const cache = new CompilerModuleCache(32)
+const scriptCache = new Map<
+  string,
+  Promise<{
+    readonly compiled: ReturnType<typeof parseCompilerResult>
+    readonly module: WebAssembly.Module
+  }>
+>()
+const filesystem = new BrowserImageFileSystem()
 
 const post = (response: WorkerResponse, transfer: Transferable[] = []): void => {
   globalThis.postMessage(response, { transfer })
@@ -78,16 +89,49 @@ const runScalar = async (source: string): Promise<RuntimeResult> => {
   )
 }
 
+const compileScript = (
+  source: string,
+): Promise<{
+  readonly compiled: ReturnType<typeof parseCompilerResult>
+  readonly module: WebAssembly.Module
+}> => {
+  const key = `${abi_version()}\u0000script\u0000${source}`
+  const cached = scriptCache.get(key)
+  if (cached !== undefined) return cached
+  const pending = (async () => {
+    const raw = compile_to_wasm(composeCompiledScriptSource(source), {
+      source_name: "playground.jl",
+      opt_level: 2,
+      entry_mode: "script",
+      imports: COMPILED_SCRIPT_IMPORTS.map((entry) => ({
+        ...entry,
+        params: [...entry.params],
+      })),
+    })
+    const compiled = parseCompilerResult(raw)
+    return { compiled, module: await WebAssembly.compile(compiled.bytes) }
+  })()
+  scriptCache.set(key, pending)
+  if (scriptCache.size > 32) {
+    const oldest = scriptCache.keys().next().value
+    if (typeof oldest === "string") scriptCache.delete(oldest)
+  }
+  return pending
+}
+
+const runScript = async (
+  source: string,
+  images: readonly BrowserImageSource[],
+): Promise<RuntimeResult> => {
+  filesystem.replaceInputs(images)
+  const { compiled, module } = await compileScript(source)
+  return { kind: "artifacts", artifacts: await executeCompiledScript(module, compiled, filesystem) }
+}
+
 const execute = async (message: WorkerRunRequest): Promise<RuntimeResult> => {
   const route = routeSource(message.request.source)
-  if (route === "image-migration-error") {
-    return {
-      kind: "error",
-      message: "Image programs must define main!(pixels::Vector{UInt8}); remove load(...).",
-      output: "",
-    }
-  }
   if (route === "interpreter") return runScalar(message.request.source)
+  if (route === "script") return runScript(message.request.source, message.request.images)
   const image = message.request.images.at(-1)
   if (image === undefined) {
     return {
@@ -105,8 +149,7 @@ globalThis.addEventListener("message", (event: MessageEvent<unknown>) => {
   void (async () => {
     try {
       const result = await execute(readRunRequest(event.data))
-      const transfer = result.kind === "image" ? [result.data.buffer] : []
-      post({ kind: "result", runId, result }, transfer)
+      post({ kind: "result", runId, result }, runtimeResultTransfers(result))
     } catch (error) {
       const raw = error instanceof Error ? error.message : "Unknown compiler worker failure"
       const message = raw.length > 0 ? raw : formatCompilerDiagnostics(error)

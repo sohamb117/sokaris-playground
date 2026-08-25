@@ -16,8 +16,8 @@ describe("runtime source routing", () => {
     expect(routeSource("result = 6 * 7")).toBe("interpreter")
   })
 
-  it("rejects image loading without main! migration", () => {
+  it("routes top-level image pipelines to script compilation", () => {
     // Given / When / Then
-    expect(routeSource('result = load("input.png")')).toBe("image-migration-error")
+    expect(routeSource('image = load("input.png")')).toBe("script")
   })
 })

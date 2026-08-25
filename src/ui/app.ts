@@ -53,10 +53,9 @@ export const mountSokarisApp = (root: HTMLElement): SokarisApp => {
     const run = latestRun + 1
     latestRun = run
     showBusy()
-    const activeImage = registry.active()
     const result = await runtime.run({
       source: dom.textarea.value,
-      images: activeImage === undefined ? [] : [activeImage],
+      images: registry.list(),
     })
     if (disposed || run !== latestRun || result.kind === "stale") return
     finishBusy()

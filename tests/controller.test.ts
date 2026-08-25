@@ -109,6 +109,33 @@ describe("runtime controller", () => {
     expect(worker.transfers[1]?.[0]).not.toBe(data.buffer)
   })
 
+  it("sends every registered image to the worker in request order", async () => {
+    // Given
+    const { factory, workers } = createWorkerFactory()
+    const { controller, worker } = await readyController(factory, workers)
+    const first = new Uint8ClampedArray([1, 1, 1, 255])
+    const second = new Uint8ClampedArray([2, 2, 2, 255])
+
+    // When
+    const run = controller.run({
+      source: "result = 42",
+      images: [
+        { filename: "inputs/first.png", width: 1, height: 1, data: first },
+        { filename: "inputs/second.png", width: 1, height: 1, data: second },
+      ],
+    })
+
+    // Then
+    expect(worker.posted[0]).toMatchObject({
+      request: {
+        images: [{ filename: "inputs/first.png" }, { filename: "inputs/second.png" }],
+      },
+    })
+    expect(worker.transfers[0]).toHaveLength(2)
+    worker.respond({ kind: "result", runId: 1, result: { kind: "scalar", value: 42, output: "" } })
+    await expect(run).resolves.toMatchObject({ kind: "scalar", value: 42 })
+  })
+
   it("rejects ready with the initial worker fatal message", async () => {
     // Given
     const { factory, workers } = createWorkerFactory()

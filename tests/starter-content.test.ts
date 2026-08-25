@@ -8,7 +8,7 @@ describe("starter content", () => {
 
     // Then
     expect(starter).toEqual({
-      filename: "input.png",
+      filename: "inputs/input.png",
       source: `function invert(value::UInt8)::UInt8
     return UInt8(255 - value)
 end

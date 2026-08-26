@@ -5,6 +5,10 @@ import { beforeAll, describe, expect, it } from "vitest"
 
 import { STARTER_SOURCE } from "../src/examples/starter.ts"
 import {
+  COMPILED_SCRIPT_IMPORTS,
+  composeCompiledScriptSource,
+} from "../src/runtime/compiled-script-source.ts"
+import {
   executeCompiledImage,
   formatCompilerDiagnostics,
   parseCompilerResult,
@@ -157,6 +161,44 @@ save("outputs/result.png", image)`,
         data: new Uint8ClampedArray([10, 20, 30, 40]),
       },
     ])
+  })
+
+  it("executes the exact load gamma save script without mutating input", async () => {
+    // Given
+    const source = composeCompiledScriptSource(`image = load("inputs/input.png")
+corrected = gamma(0.85)(image)
+save("outputs/gamma.png", corrected)`)
+    const raw = compile_to_wasm(source, {
+      source_name: "gamma-script.jl",
+      opt_level: 2,
+      entry_mode: "script",
+      imports: COMPILED_SCRIPT_IMPORTS.map((entry) => ({
+        ...entry,
+        params: [...entry.params],
+      })),
+    })
+    const compiled = parseCompilerResult(raw)
+    const module = await WebAssembly.compile(compiled.bytes)
+    const original = new Uint8ClampedArray([64, 128, 192, 255])
+    const filesystem = new BrowserImageFileSystem()
+    filesystem.replaceInputs([
+      { filename: "inputs/input.png", width: 1, height: 1, data: original },
+    ])
+
+    // When
+    const outputs = await executeCompiledScript(module, compiled, filesystem)
+
+    // Then
+    const gammaByte = (value: number): number => Math.round((value / 255) ** 0.85 * 255)
+    expect(outputs).toEqual([
+      {
+        filename: "outputs/gamma.png",
+        width: 1,
+        height: 1,
+        data: new Uint8ClampedArray([gammaByte(64), gammaByte(128), gammaByte(192), 255]),
+      },
+    ])
+    expect(original).toEqual(new Uint8ClampedArray([64, 128, 192, 255]))
   })
 
   it("compiles and runs the exact helper, loop, and branch starter", async () => {

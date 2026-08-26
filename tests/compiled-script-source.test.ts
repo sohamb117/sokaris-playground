@@ -15,6 +15,8 @@ save("output.png", image)`
     expect(compiled.endsWith(source)).toBe(true)
     expect(compiled).toContain("load(path::String)::Array{UInt8,3}")
     expect(compiled).toContain("save(path::String, image::Array{UInt8,3})::Nothing")
+    expect(compiled).toContain("▷(value, transform) = transform(value)")
+    expect(compiled).toContain("function gamma(exponent::Float64)")
   })
 
   it("declares exact browser image imports", () => {

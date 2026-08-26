@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "sourceProject": "subset_julia_vm",
-  "sourceCommit": "742150b554f739670fc9cf22321f3fc04e66ef8d",
+  "sourceCommit": "ea1188d131ebab2da1af56c94651898868bb7f61",
   "package": "subset_julia_vm_web",
   "version": "0.11.1",
   "compilerAbiVersion": 3,
@@ -13,8 +13,8 @@
     },
     {
       "path": "subset_julia_vm_web_bg.wasm",
-      "sha256": "c2b6eef17d1e743579e4bfbefe741bf4b44f915a8a5cf88912cfee7a27f57ad2",
-      "size": 24258797
+      "sha256": "38d8be4638c4c382f5f7195021da86e54a3c9d5bf2da6fabff4659e45c07c46b",
+      "size": 24264152
     },
     {
       "path": "subset_julia_vm_web.d.ts",

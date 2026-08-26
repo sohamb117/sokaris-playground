@@ -95,14 +95,14 @@ end`
   })
 })
 
-test("load without main! shows migration guidance and compiler diagnostics remain explicit", async ({
+test("top-level load reports missing images and compiler diagnostics remain explicit", async ({
   page,
 }) => {
   await page.goto("/?runtime-test=1")
   await expect.poll(() => page.evaluate(() => window.__sokarisRuntime?.ready)).toBe(true)
   await expect(runHarness(page, 'result = load("missing.png")')).resolves.toMatchObject({
     kind: "error",
-    message: expect.stringContaining("main!(pixels::Vector{UInt8})"),
+    message: "Sokaris subset error: image 'missing.png' is not loaded.",
   })
   await expect(
     runHarness(

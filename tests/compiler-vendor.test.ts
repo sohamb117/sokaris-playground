@@ -201,6 +201,36 @@ save("outputs/gamma.png", corrected)`)
     expect(original).toEqual(new Uint8ClampedArray([64, 128, 192, 255]))
   })
 
+  it("executes the complete Imhotep image pipeline through typed host transforms", async () => {
+    const source = composeCompiledScriptSource(`image = load("inputs/input.png")
+result = image ▷ float ▷ invert ▷ gamma(0.85) ▷ brightness(0.1) ▷ contrast(1.1) ▷ saturate(1.2) ▷ desaturate(0.1) ▷ grayscale ▷ gaussian(1.0) ▷ box_blur(3) ▷ median_blur(3) ▷ motion_blur(3,0) ▷ sharpen(1.0) ▷ edge_detect ▷ emboss ▷ posterize(4) ▷ threshold(0.5) ▷ solarize(0.5) ▷ noise(0.1) ▷ pixelate(1) ▷ crop(1,1,1,1) ▷ crop_center(1,1) ▷ crop_to(1,1) ▷ scale_crop(1,1) ▷ glow(1.0,0.5) ▷ 𓇬
+save("outputs/all.png", result)`)
+    const raw = compile_to_wasm(source, {
+      source_name: "all-transforms.jl",
+      opt_level: 2,
+      entry_mode: "script",
+      imports: COMPILED_SCRIPT_IMPORTS.map((entry) => ({ ...entry, params: [...entry.params] })),
+    })
+    const compiled = parseCompilerResult(raw)
+    const module = await WebAssembly.compile(compiled.bytes)
+    const filesystem = new BrowserImageFileSystem()
+    filesystem.replaceInputs([
+      {
+        filename: "inputs/input.png",
+        width: 2,
+        height: 2,
+        data: new Uint8ClampedArray([
+          0, 64, 128, 255, 255, 128, 64, 255, 32, 96, 160, 255, 224, 192, 16, 255,
+        ]),
+      },
+    ])
+
+    const outputs = await executeCompiledScript(module, compiled, filesystem)
+
+    expect(outputs).toHaveLength(1)
+    expect(outputs[0]).toMatchObject({ filename: "outputs/all.png", width: 1, height: 1 })
+  })
+
   it("compiles and runs the exact helper, loop, and branch starter", async () => {
     // Given
     const compiled = parseCompilerResult(compile(STARTER_SOURCE))

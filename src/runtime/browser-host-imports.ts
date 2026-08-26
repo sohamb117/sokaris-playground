@@ -1,3 +1,4 @@
+import { applyImageOperation } from "./image-operations.ts"
 import type { BrowserImageSource } from "./types.ts"
 import type { BrowserImageFileSystem, BrowserImageRun } from "./virtual-filesystem.ts"
 
@@ -177,6 +178,29 @@ export const createBrowserHostImports = (options: BrowserHostOptions) => ({
         height: checkedNumber(image.dimensions[2] ?? 0n, "Image height"),
         data: image.data,
       })
+    },
+    transform: (
+      nameView: number,
+      descriptor: number,
+      first: number,
+      second: number,
+      third: number,
+      fourth: number,
+      textView: number,
+    ): number => {
+      const input = readImageDescriptor(options.memory, descriptor)
+      const width = checkedNumber(input.dimensions[1] ?? 0n, "Image width")
+      const height = checkedNumber(input.dimensions[2] ?? 0n, "Image height")
+      const output = applyImageOperation({
+        name: readPath(options.memory, nameView),
+        image: { filename: "transform", width, height, data: input.data },
+        args: [first, second, third, fourth],
+        text: readPath(options.memory, textView),
+      })
+      const outputPointer = options.allocate(BigInt(HEADER_BYTES + IMAGE_RANK * AXIS_BYTES), 8)
+      if (outputPointer === 0) throw new RangeError("Could not allocate transform descriptor")
+      writeImageDescriptor(options.memory, options.allocate, outputPointer, output)
+      return outputPointer
     },
   },
 })

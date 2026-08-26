@@ -134,6 +134,27 @@ test("runtime execution makes no backend or external evaluator request", async (
   expect(requests.some((url) => new URL(url).hostname !== "127.0.0.1")).toBe(false)
 })
 
+test("complete compiled Imhotep transform chain returns a saved artifact", async ({ page }) => {
+  await page.goto("/?runtime-test=1")
+  await expect.poll(() => page.evaluate(() => window.__sokarisRuntime?.ready)).toBe(true)
+  const source = `image = load("all-source.png")
+result = image ▷ float ▷ invert ▷ gamma(0.85) ▷ brightness(0.1) ▷ contrast(1.1) ▷ saturate(1.2) ▷ desaturate(0.1) ▷ grayscale ▷ gaussian(1.0) ▷ box_blur(3) ▷ median_blur(3) ▷ motion_blur(3,0) ▷ sharpen(1.0) ▷ edge_detect ▷ emboss ▷ posterize(4) ▷ threshold(0.5) ▷ solarize(0.5) ▷ noise(0.1) ▷ pixelate(1) ▷ crop(1,1,1,1) ▷ crop_center(1,1) ▷ crop_to(1,1) ▷ scale_crop(1,1) ▷ glow(1.0,0.5) ▷ 𓇬
+save("outputs/all.png", result)`
+  const result = await runHarness(page, source, [
+      {
+        filename: "all-source.png",
+        width: 2,
+        height: 2,
+        data: [0, 64, 128, 255, 255, 128, 64, 255, 32, 96, 160, 255, 224, 192, 16, 255],
+      },
+    ])
+  if (result.kind === "error") throw new Error(result.message)
+  expect(result).toMatchObject({
+    kind: "artifacts",
+    artifacts: [{ filename: "outputs/all.png", width: 1, height: 1 }],
+  })
+})
+
 test("all fourteen glyphs are browser-probed or explicitly unsupported", async ({ page }) => {
   await page.goto("/?runtime-test=1")
   await expect.poll(() => page.evaluate(() => window.__sokarisRuntime?.ready)).toBe(true)

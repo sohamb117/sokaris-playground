@@ -22,6 +22,10 @@ type ScriptExecutorDependencies = {
 const EXPECTED_IMPORTS = new Map([
   ["sjulia_host.load", "String->Array{UInt8, 3}"],
   ["sjulia_host.save", "String,Array{UInt8, 3}->Nothing"],
+  [
+    "sjulia_host.transform",
+    "String,Array{UInt8, 3},Float64,Float64,Float64,Float64,String->Array{UInt8, 3}",
+  ],
 ])
 
 const importIdentity = (value: { readonly module: string; readonly name: string }): string =>
@@ -92,6 +96,15 @@ export const executeCompiledScript = async (
     sjulia_host: {
       load: (path: number): number => host().load(path),
       save: (path: number, descriptor: number): void => host().save(path, descriptor),
+      transform: (
+        name: number,
+        descriptor: number,
+        first: number,
+        second: number,
+        third: number,
+        fourth: number,
+        text: number,
+      ): number => host().transform(name, descriptor, first, second, third, fourth, text),
     },
   }
   const instantiate = dependencies.instantiate ?? WebAssembly.instantiate

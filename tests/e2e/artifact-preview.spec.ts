@@ -42,6 +42,9 @@ test("previews clickable top-level load and save artifacts without rerunning", a
     mimeType: "image/png",
     buffer: await createVisiblePng(page),
   })
+  const outputPane = page.locator("[data-output-pane]")
+  await expect(outputPane).toHaveAttribute("aria-busy", "true", { timeout: 5_000 })
+  await expect(outputPane).not.toHaveAttribute("aria-busy", "true", { timeout: 30_000 })
   const editor = page.getByRole("textbox", { name: "Sokaris code" })
   const source = `image = load("source.png")
 save("results/first.png", image)

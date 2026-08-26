@@ -20,4 +20,10 @@ describe("runtime source routing", () => {
     // Given / When / Then
     expect(routeSource('image = load("input.png")')).toBe("script")
   })
+
+  it("keeps image scripts compiled when they assign result", () => {
+    expect(routeSource('image = load("input.png")\nresult = image\nsave("out.png", result)')).toBe(
+      "script",
+    )
+  })
 })

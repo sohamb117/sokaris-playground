@@ -9,6 +9,8 @@ test("renders a native canvas without pixelated upscaling", async ({ page }) => 
   // Given
   await page.goto("/")
   await expect(page.getByText("loading runtime")).toBeHidden({ timeout: 30_000 })
+  await page.getByRole("textbox", { name: "Sokaris code" }).fill(`image = load("pixel.png")
+save("output.png", image)`)
   await page.locator('input[type="file"]').setInputFiles({
     name: "pixel.png",
     mimeType: "image/png",
@@ -61,5 +63,5 @@ test("keeps keyboard focus visually unique when another operator is hovered", as
   })
   await page.getByRole("main").screenshot({ path: "test-results/evidence/menu-hover-focus.png" })
   await page.keyboard.press("Enter")
-  await expect(editor).toHaveValue(/▷end$/)
+  await expect(editor).toHaveValue(/\n▷save\("output.png", result\)$/)
 })

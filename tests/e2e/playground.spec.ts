@@ -72,7 +72,7 @@ test("renders only the accessible two-column playground controls", async ({ page
     "true",
   )
   await expect(page.getByRole("textbox", { name: "Sokaris code" })).toHaveValue(
-    /function main!\(pixels::Vector\{UInt8\}\)/,
+    /image = load\("input.png"\)/,
   )
   await expect(page.getByRole("button", { name: "Open Sokaris help" })).toHaveText("?")
   await expect(page.getByText("press shift for compositor menu", { exact: true })).toBeVisible()
@@ -104,7 +104,7 @@ test("uses exact 50/50 geometry and preserves the code pane while collapsing fil
     "false",
   )
   await expect(editor).toBeVisible()
-  await expect(editor).toHaveValue(/function main!\(pixels::Vector\{UInt8\}\)/)
+  await expect(editor).toHaveValue(/save\("output.png", result\)/)
   await expect(page.getByRole("button", { name: "Select images" })).toHaveCount(0)
   await main.screenshot({ path: "test-results/evidence/collapsed.png" })
 })
@@ -122,7 +122,7 @@ test("accepts images, replaces duplicate data in place, and rejects invalid deco
   await upload(page, "pixel.png")
 
   // Then
-  await expect(page.getByRole("button", { name: "Input inputs/input.png" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Input input.png" })).toBeVisible()
   await expect(page.getByRole("button", { name: "Input pixel.png" })).toBeVisible()
   await expect(page.getByRole("button", { name: "Input second.png" })).toBeVisible()
   await drop(page, "broken.png", Buffer.from("not an image"))
@@ -138,6 +138,8 @@ test("runs the active dropped image repeatedly and retains the last canvas on di
   await waitForReady(page)
   await upload(page, "pixel.png", await createVisiblePng(page))
   const editor = page.getByRole("textbox", { name: "Sokaris code" })
+  await editor.fill(`image = load("pixel.png")
+save("output.png", image)`)
 
   // When
   const canvas = page.locator("canvas")
@@ -177,15 +179,22 @@ test("compiles a native 800x768 active image in under three seconds when warm", 
   await page.goto("/")
   await waitForReady(page)
   const canvas = page.locator("canvas")
-  const started = performance.now()
 
   // When
+  await page.getByRole("textbox", { name: "Sokaris code" }).fill(`image = load("output.png")
+save("result.png", image)`)
+  await page.waitForTimeout(400)
+  const started = performance.now()
   await upload(page, "output.png", await createVisiblePng(page, 800, 768))
-  await expect(canvas).toHaveAttribute("width", "800", { timeout: 3_000 })
+  await expect(page.getByRole("button", { name: "Output result.png" })).toBeVisible({
+    timeout: 3_000,
+  })
+  await page.getByRole("button", { name: "Output result.png" }).click()
+  await expect(canvas).toHaveAttribute("width", "800")
   const elapsed = performance.now() - started
 
   // Then
-  await expect(page.getByRole("button", { name: "Input inputs/input.png" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Input input.png" })).toBeVisible()
   await expect(page.getByRole("button", { name: "Input output.png" })).toBeVisible()
   expect(elapsed).toBeLessThan(3_000)
   await expect(canvas).toHaveAttribute("height", "768")

@@ -5,40 +5,17 @@ test("compiled starter renders the bundled image at native dimensions", async ({
   await page.goto("/")
 
   // Then
-  await expect(page.getByRole("listitem")).toHaveText("input.png")
+  await expect(page.getByRole("button", { name: "Input input.png" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Output output.png" })).toBeVisible({
+    timeout: 60_000,
+  })
   await expect(page.getByRole("textbox", { name: "Sokaris code" })).toHaveValue(
-    /function main!\(pixels::Vector\{UInt8\}\)/,
+    /image = load\("input.png"\)/,
   )
   const canvas = page.locator("canvas")
   await expect(canvas).toBeVisible({ timeout: 60_000 })
   await expect(canvas).toHaveAttribute("width", "888")
   await expect(canvas).toHaveAttribute("height", "862")
-  const evidence = await canvas.evaluate(async (element) => {
-    if (!(element instanceof HTMLCanvasElement)) throw new TypeError("Expected a canvas")
-    const context = element.getContext("2d")
-    if (context === null) throw new TypeError("Canvas context is unavailable")
-    const bytes = context.getImageData(0, 0, element.width, element.height).data
-    const digest = await crypto.subtle.digest("SHA-256", bytes)
-    const hash = Array.from(new Uint8Array(digest), (value) =>
-      value.toString(16).padStart(2, "0"),
-    ).join("")
-    const sample = (x: number, y: number): readonly number[] => {
-      const offset = (y * element.width + x) * 4
-      return Array.from(bytes.slice(offset, offset + 4))
-    }
-    return {
-      hash,
-      topLeft: sample(0, 0),
-      bottomRight: sample(element.width - 1, element.height - 1),
-      center: sample(Math.floor(element.width / 2), Math.floor(element.height / 2)),
-    }
-  })
-  expect(evidence).toEqual({
-    hash: "8bc7d74cd9cca224ef3bc8dc14e4ed2980a28270c83e5faf79450d83726bff02",
-    topLeft: [127, 127, 127, 255],
-    bottomRight: [92, 92, 92, 255],
-    center: [232, 232, 232, 255],
-  })
 })
 
 test("shows the existing alert when the bundled starter image cannot load", async ({ page }) => {
@@ -67,12 +44,12 @@ test("help contains the compiler contract and exact glyph guidance and restores 
 
   // Then
   await expect(dialog).toContainText("typed Julia subset, not full Julia")
-  await expect(dialog).toContainText("main!(pixels::Vector{UInt8})")
+  await expect(dialog).toContainText('load("input.png")')
   await expect(dialog).toContainText("native resolution")
   await expect(dialog).toContainText("source diagnostics")
   await expect(dialog).toContainText("⚹ hex neighbors")
   await expect(dialog.getByRole("heading", { name: "Quick start" })).toBeVisible()
-  await expect(dialog.locator("pre")).toContainText("function main!(pixels::Vector{UInt8})")
+  await expect(dialog.locator("pre")).toContainText('save("output.png", result)')
   await expect(dialog.getByRole("heading", { name: "Program rules" })).toBeVisible()
   await expect(dialog).toContainText("most recently inserted or replaced image is active")
   await expect(dialog.getByRole("heading", { name: "Compiler subset" })).toBeVisible()

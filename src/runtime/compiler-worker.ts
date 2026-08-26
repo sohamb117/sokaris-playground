@@ -3,7 +3,10 @@ import initCompiler, {
   compile_to_wasm,
 } from "../vendor/subset-julia-compiler/subset_julia_vm_web.js"
 import compilerWasmUrl from "../vendor/subset-julia-compiler/subset_julia_vm_web_bg.wasm?url"
-import { COMPILED_SCRIPT_IMPORTS, composeCompiledScriptSource } from "./compiled-script-source.ts"
+import {
+  compiledScriptImportsForSource,
+  composeCompiledScriptSource,
+} from "./compiled-script-source.ts"
 import { CompilerModuleCache } from "./compiler-cache.ts"
 import {
   executeCompiledImage,
@@ -103,7 +106,7 @@ const compileScript = (
       source_name: "playground.jl",
       opt_level: 2,
       entry_mode: "script",
-      imports: COMPILED_SCRIPT_IMPORTS.map((entry) => ({
+      imports: compiledScriptImportsForSource(source).map((entry) => ({
         ...entry,
         params: [...entry.params],
       })),

@@ -9,7 +9,7 @@ export const GLYPHS = [
   { glyph: "⚕", description: "replace nothing or NaN with a default" },
   { glyph: "𓇬", description: "clamp values to 0 through 1" },
   { glyph: "☿", description: "memoize a function" },
-  { glyph: "⚹", description: "unsupported in v0.12.2; hex neighbors" },
+  { glyph: "⚹", description: "hex neighbors" },
   { glyph: "✦", description: "Cartesian product" },
   { glyph: "☥", description: "deep copy" },
   { glyph: "⚸", description: "accumulate with f" },

@@ -17,8 +17,17 @@ function ☿(f)
         cache[x]
     end
 end
-function ⚹(args...)
-    error("Sokaris subset error: ⚹ is not supported by SubsetJuliaVM v0.12.2.")
+function ⚹(array, i, j)
+    neighbors = eltype(array)[]
+    offsets = [(0, 1), (1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1)]
+    for (di, dj) in offsets
+        ni = i + di
+        nj = j + dj
+        if ni >= 1 && ni <= size(array, 1) && nj >= 1 && nj <= size(array, 2)
+            push!(neighbors, array[ni, nj])
+        end
+    end
+    neighbors
 end
 ✦(a, b) = [(x, y) for x in a, y in b]
 ☥(x) = deepcopy(x)

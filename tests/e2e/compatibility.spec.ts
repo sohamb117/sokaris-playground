@@ -70,7 +70,7 @@ test("help contains the compiler contract and exact glyph guidance and restores 
   await expect(dialog).toContainText("main!(pixels::Vector{UInt8})")
   await expect(dialog).toContainText("native resolution")
   await expect(dialog).toContainText("source diagnostics")
-  await expect(dialog).toContainText("⚹ unsupported in v0.12.2")
+  await expect(dialog).toContainText("⚹ hex neighbors")
   await expect(dialog.getByRole("heading", { name: "Quick start" })).toBeVisible()
   await expect(dialog.locator("pre")).toContainText("function main!(pixels::Vector{UInt8})")
   await expect(dialog.getByRole("heading", { name: "Program rules" })).toBeVisible()

@@ -102,7 +102,7 @@ test("top-level load reports missing images and compiler diagnostics remain expl
   await expect.poll(() => page.evaluate(() => window.__sokarisRuntime?.ready)).toBe(true)
   await expect(runHarness(page, 'result = load("missing.png")')).resolves.toMatchObject({
     kind: "error",
-    message: "Sokaris subset error: image 'missing.png' is not loaded.",
+    message: "Virtual image not found: missing.png",
   })
   await expect(
     runHarness(
@@ -141,13 +141,13 @@ test("complete compiled Imhotep transform chain returns a saved artifact", async
 result = image ▷ float ▷ invert ▷ gamma(0.85) ▷ brightness(0.1) ▷ contrast(1.1) ▷ saturate(1.2) ▷ desaturate(0.1) ▷ grayscale ▷ gaussian(1.0) ▷ box_blur(3) ▷ median_blur(3) ▷ motion_blur(3,0) ▷ sharpen(1.0) ▷ edge_detect ▷ emboss ▷ posterize(4) ▷ threshold(0.5) ▷ solarize(0.5) ▷ noise(0.1) ▷ pixelate(1) ▷ crop(1,1,1,1) ▷ crop_center(1,1) ▷ crop_to(1,1) ▷ scale_crop(1,1) ▷ glow(1.0,0.5) ▷ 𓇬
 save("outputs/all.png", result)`
   const result = await runHarness(page, source, [
-      {
-        filename: "all-source.png",
-        width: 2,
-        height: 2,
-        data: [0, 64, 128, 255, 255, 128, 64, 255, 32, 96, 160, 255, 224, 192, 16, 255],
-      },
-    ])
+    {
+      filename: "all-source.png",
+      width: 2,
+      height: 2,
+      data: [0, 64, 128, 255, 255, 128, 64, 255, 32, 96, 160, 255, 224, 192, 16, 255],
+    },
+  ])
   if (result.kind === "error") throw new Error(result.message)
   expect(result).toMatchObject({
     kind: "artifacts",
@@ -176,8 +176,8 @@ test("all fourteen glyphs are browser-probed or explicitly unsupported", async (
   await expect(
     runHarness(page, "result = ⇉(x -> x + 1, x -> x * 2)(20)[1]"),
   ).resolves.toMatchObject({ kind: "scalar", value: 21 })
-  await expect(runHarness(page, "result = ⚹([1 2; 3 4], 1, 1)")).resolves.toMatchObject({
-    kind: "error",
-    message: "Sokaris subset error: ⚹ is not supported by SubsetJuliaVM v0.12.2.",
+  await expect(runHarness(page, "result = sum(⚹([1 2; 3 4], 1, 1))")).resolves.toMatchObject({
+    kind: "scalar",
+    value: 5,
   })
 })

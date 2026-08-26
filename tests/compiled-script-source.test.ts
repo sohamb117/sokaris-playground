@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   COMPILED_SCRIPT_IMPORTS,
+  compiledScriptImportsForSource,
   composeCompiledScriptSource,
 } from "../src/runtime/compiled-script-source.ts"
 
@@ -44,5 +45,16 @@ save("output.png", image)`
         result: "Array{UInt8,3}",
       },
     ])
+  })
+
+  it("requests only imports used by visible source", () => {
+    expect(
+      compiledScriptImportsForSource('image = load("input.png")').map(({ name }) => name),
+    ).toEqual(["load"])
+    expect(
+      compiledScriptImportsForSource(
+        'image = load("input.png")\nresult = gamma(0.85)(image)\nsave("out.png", result)',
+      ).map(({ name }) => name),
+    ).toEqual(["load", "save", "transform"])
   })
 })

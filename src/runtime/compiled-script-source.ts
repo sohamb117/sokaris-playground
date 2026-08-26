@@ -74,3 +74,19 @@ export const COMPILED_SCRIPT_IMPORTS = [
     result: "Array{UInt8,3}",
   },
 ] as const
+
+export const compiledScriptImportsForSource = (
+  source: string,
+): readonly (typeof COMPILED_SCRIPT_IMPORTS)[number][] => {
+  const names = new Set<string>()
+  if (/\bload\s*\(/.test(source)) names.add("load")
+  if (/\bsave\s*\(/.test(source)) names.add("save")
+  if (
+    /\b(?:float|invert|gamma|brightness|contrast|saturate|desaturate|grayscale|gaussian|box_blur|median_blur|motion_blur|sharpen|edge_detect|emboss|posterize|threshold|solarize|noise|pixelate|crop|crop_center|crop_to|scale_crop|glow|text_overlay)\b|𓇬/.test(
+      source,
+    )
+  ) {
+    names.add("transform")
+  }
+  return COMPILED_SCRIPT_IMPORTS.filter((entry) => names.has(entry.name))
+}

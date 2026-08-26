@@ -88,4 +88,16 @@ describe("browser image filesystem", () => {
     expect(filesystem.inputs()[0]?.data[0]).toBe(1)
     expect(filesystem.outputs()[0]?.data[0]).toBe(2)
   })
+
+  it("clears prior outputs when a new input set starts", () => {
+    const filesystem = new BrowserImageFileSystem()
+    const run = filesystem.beginRun()
+    run.save("output.png", image("ignored.png", 1))
+    run.commit()
+
+    filesystem.replaceInputs([image("output.png", 2)])
+
+    expect(filesystem.outputs()).toEqual([])
+    expect(filesystem.load("output.png").data[0]).toBe(2)
+  })
 })

@@ -99,6 +99,26 @@ export const runtimeResultTransfers = (result: RuntimeResult): Transferable[] =>
   return []
 }
 
+export const prepareRuntimeResultTransfer = (
+  result: RuntimeResult,
+): { readonly result: RuntimeResult; readonly transfer: Transferable[] } => {
+  if (result.kind === "image") {
+    const data = new Uint8ClampedArray(result.data)
+    return { result: { ...result, data }, transfer: [data.buffer] }
+  }
+  if (result.kind === "artifacts") {
+    const artifacts = result.artifacts.map((artifact) => ({
+      ...artifact,
+      data: new Uint8ClampedArray(artifact.data),
+    }))
+    return {
+      result: { kind: "artifacts", artifacts },
+      transfer: artifacts.map(({ data }) => data.buffer),
+    }
+  }
+  return { result, transfer: [] }
+}
+
 export const parseWorkerResponse = (value: unknown): WorkerResponse => {
   const kind = readProperty(value, "kind")
   const version = readProperty(value, "version")

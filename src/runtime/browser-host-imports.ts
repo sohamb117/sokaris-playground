@@ -156,6 +156,29 @@ const writeImageDescriptor = (
   })
 }
 
+const overwriteImageDescriptor = (
+  memory: WebAssembly.Memory,
+  pointer: number,
+  descriptor: ImageDescriptor,
+  image: BrowserImageSource,
+): void => {
+  const dataPointer = new DataView(memory.buffer).getUint32(pointer + 24, true)
+  const channelStride = descriptor.strides[0] ?? 0n
+  const xStride = descriptor.strides[1] ?? 0n
+  const yStride = descriptor.strides[2] ?? 0n
+  const target = new Uint8Array(memory.buffer)
+  for (let y = 0; y < image.height; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      for (let channel = 0; channel < 4; channel += 1) {
+        const targetOffset =
+          BigInt(channel) * channelStride + BigInt(x) * xStride + BigInt(y) * yStride
+        target[dataPointer + checkedNumber(targetOffset, "Image offset")] =
+          image.data[(y * image.width + x) * 4 + channel] ?? 0
+      }
+    }
+  }
+}
+
 export const createBrowserHostImports = (options: BrowserHostOptions) => ({
   sjulia_host: {
     load: (pathView: number): number => {
@@ -197,6 +220,10 @@ export const createBrowserHostImports = (options: BrowserHostOptions) => ({
         args: [first, second, third, fourth],
         text: readPath(options.memory, textView),
       })
+      if (output.width === width && output.height === height) {
+        overwriteImageDescriptor(options.memory, descriptor, input, output)
+        return descriptor
+      }
       const outputPointer = options.allocate(BigInt(HEADER_BYTES + IMAGE_RANK * AXIS_BYTES), 8)
       if (outputPointer === 0) throw new RangeError("Could not allocate transform descriptor")
       writeImageDescriptor(options.memory, options.allocate, outputPointer, output)

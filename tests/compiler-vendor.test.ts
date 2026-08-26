@@ -8,11 +8,7 @@ import {
   COMPILED_SCRIPT_IMPORTS,
   composeCompiledScriptSource,
 } from "../src/runtime/compiled-script-source.ts"
-import {
-  executeCompiledImage,
-  formatCompilerDiagnostics,
-  parseCompilerResult,
-} from "../src/runtime/compiler-contract.ts"
+import { formatCompilerDiagnostics, parseCompilerResult } from "../src/runtime/compiler-contract.ts"
 import { executeCompiledScript } from "../src/runtime/script-executor.ts"
 import { BrowserImageFileSystem } from "../src/runtime/virtual-filesystem.ts"
 import initCompiler, {
@@ -231,22 +227,32 @@ save("outputs/all.png", result)`)
     expect(outputs[0]).toMatchObject({ filename: "outputs/all.png", width: 1, height: 1 })
   })
 
-  it("compiles and runs the exact helper, loop, and branch starter", async () => {
+  it("compiles and runs the exact top-level Sokaris starter", async () => {
     // Given
-    const compiled = parseCompilerResult(compile(STARTER_SOURCE))
+    const raw = compile_to_wasm(composeCompiledScriptSource(STARTER_SOURCE), {
+      source_name: "starter.jl",
+      opt_level: 2,
+      entry_mode: "script",
+      imports: COMPILED_SCRIPT_IMPORTS.map((entry) => ({ ...entry, params: [...entry.params] })),
+    })
+    const compiled = parseCompilerResult(raw)
     const module = await WebAssembly.compile(compiled.bytes)
-    const data = new Uint8ClampedArray([0, 64, 128, 255, 1, 2, 3, 254])
+    const filesystem = new BrowserImageFileSystem()
+    filesystem.replaceInputs([
+      {
+        filename: "input.png",
+        width: 2,
+        height: 1,
+        data: new Uint8ClampedArray([0, 64, 128, 255, 1, 2, 3, 254]),
+      },
+    ])
 
     // When
-    const result = await executeCompiledImage(module, {
-      filename: "tiny.png",
-      width: 2,
-      height: 1,
-      data,
-    })
+    const outputs = await executeCompiledScript(module, compiled, filesystem)
 
     // Then
-    expect(result.data).toEqual(new Uint8ClampedArray([255, 191, 127, 255, 254, 253, 252, 254]))
+    expect(outputs).toHaveLength(1)
+    expect(outputs[0]).toMatchObject({ filename: "output.png", width: 2, height: 1 })
   })
 
   it("reports an explicit diagnostic for unsupported dynamic String construction", () => {

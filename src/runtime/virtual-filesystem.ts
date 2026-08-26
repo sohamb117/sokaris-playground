@@ -69,6 +69,7 @@ export class BrowserImageFileSystem {
   private outputFiles = new Map<string, BrowserImageSource>()
 
   replaceInputs(images: readonly BrowserImageSource[]): void {
+    this.outputFiles = new Map()
     for (const image of images) {
       const path = normalizeVirtualPath(image.filename)
       this.inputFiles.set(path, copyImage(path, image))

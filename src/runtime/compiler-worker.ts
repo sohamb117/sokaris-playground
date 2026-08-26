@@ -14,7 +14,11 @@ import {
   parseCompilerResult,
 } from "./compiler-contract.ts"
 import { composeRuntimeSource } from "./julia-source.ts"
-import { runtimeResultTransfers, type WorkerResponse, type WorkerRunRequest } from "./protocol.ts"
+import {
+  prepareRuntimeResultTransfer,
+  type WorkerResponse,
+  type WorkerRunRequest,
+} from "./protocol.ts"
 import { parseExecutionResult } from "./result-parser.ts"
 import { executeCompiledScript } from "./script-executor.ts"
 import { routeSource } from "./source-route.ts"
@@ -152,7 +156,8 @@ globalThis.addEventListener("message", (event: MessageEvent<unknown>) => {
   void (async () => {
     try {
       const result = await execute(readRunRequest(event.data))
-      post({ kind: "result", runId, result }, runtimeResultTransfers(result))
+      const prepared = prepareRuntimeResultTransfer(result)
+      post({ kind: "result", runId, result: prepared.result }, prepared.transfer)
     } catch (error) {
       const raw = error instanceof Error ? error.message : "Unknown compiler worker failure"
       const message = raw.length > 0 ? raw : formatCompilerDiagnostics(error)

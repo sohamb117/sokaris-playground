@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { parseWorkerResponse, runtimeResultTransfers } from "../src/runtime/protocol.ts"
+import {
+  parseWorkerResponse,
+  prepareRuntimeResultTransfer,
+  runtimeResultTransfers,
+} from "../src/runtime/protocol.ts"
 
 describe("runtime artifact protocol", () => {
   it("parses ordered image artifacts and transfers every pixel buffer", () => {
@@ -53,5 +57,22 @@ describe("runtime artifact protocol", () => {
       })
 
     expect(parse).toThrow("Invalid runtime artifact")
+  })
+
+  it("copies result buffers before transfer so worker-owned artifacts remain attached", () => {
+    const original = new Uint8ClampedArray([1, 2, 3, 4])
+
+    const prepared = prepareRuntimeResultTransfer({
+      kind: "artifacts",
+      artifacts: [{ filename: "output.png", width: 1, height: 1, data: original }],
+    })
+
+    expect(prepared.transfer).toHaveLength(1)
+    expect(prepared.transfer[0]).not.toBe(original.buffer)
+    expect(original.byteLength).toBe(4)
+    expect(prepared.result).toEqual({
+      kind: "artifacts",
+      artifacts: [{ filename: "output.png", width: 1, height: 1, data: original }],
+    })
   })
 })

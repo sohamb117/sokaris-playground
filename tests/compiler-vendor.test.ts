@@ -81,6 +81,31 @@ image = load("inputs/input.png")`,
     ])
   })
 
+  it("compiles captured multi-statement closures in script mode", async () => {
+    // Given
+    const raw = compile_to_wasm(
+      `function gamma(exponent::Float64)
+    return function(channel::Float64)::Float64
+        adjusted = channel ^ exponent
+        return adjusted
+    end
+end
+correct = gamma(0.85)
+result = correct(0.25)`,
+      { source_name: "closure-script.jl", opt_level: 2, entry_mode: "script" },
+    )
+
+    // When
+    const compiled = parseCompilerResult(raw)
+    const module = await WebAssembly.compile(compiled.bytes)
+    const instance = await WebAssembly.instantiate(module, {})
+    const entry = compiled.entryPoint && Reflect.get(instance.exports, compiled.entryPoint)
+
+    // Then
+    expect(typeof entry).toBe("function")
+    if (typeof entry === "function") entry()
+  })
+
   it("executes browser-backed load and save as a transaction", async () => {
     const raw = compile_to_wasm(
       `load(path::String)::Array{UInt8,3} = Array{UInt8,3}(undef, 0, 0, 0)

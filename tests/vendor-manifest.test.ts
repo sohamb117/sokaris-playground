@@ -44,7 +44,7 @@ describe("SubsetJuliaVM vendor manifest", () => {
     // Then
     expect(compilerManifest).toMatchObject({
       sourceProject: "subset_julia_vm",
-      sourceCommit: "4088a5707c1003e56efe980461e15cdc73d82ae5",
+      sourceCommit: "86c83a042f75eb472ac4564dae0ade9ece32f0b5",
       package: "subset_julia_vm_web",
       version: "0.11.1",
       compilerAbiVersion: 3,
@@ -53,6 +53,6 @@ describe("SubsetJuliaVM vendor manifest", () => {
     expect(actual.map(({ path, sha256 }) => ({ path, sha256 }))).toEqual(
       compilerManifest.files.map(({ path, sha256 }) => ({ path, sha256 })),
     )
-    expect(actual.find((file) => file.path.endsWith(".wasm"))?.size).toBe(26_811_077)
+    expect(actual.find((file) => file.path.endsWith(".wasm"))?.size).toBe(24_258_248)
   })
 })
